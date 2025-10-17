@@ -15,11 +15,12 @@ func main() {
 	log.Println("Telemetry Streamer starting...")
 
 	// Define CLI flags
-	csvPath := flag.String("csv", "", "Path to the CSV file containing telemetry data")
+	csvPath := flag.String("csv-file", "", "Path to the CSV file containing telemetry data")
 	workers := flag.Int("workers", 1, "Number of worker goroutines")
 	rate := flag.Float64("rate", 1.0, "Messages per second per worker (fractional values allowed)")
 	persistence := flag.Bool("persistence", false, "Enable message persistence")
 	persistenceDir := flag.String("persistence-dir", "/tmp/mq-data", "Directory for message persistence")
+	brokerURL := flag.String("broker-url", "", "URL of remote MQ broker (if not set, uses local broker)")
 	flag.Parse()
 
 	if *csvPath == "" {
@@ -35,12 +36,22 @@ func main() {
 	}
 
 	// Initialize the message broker with configuration
-	config := mq.DefaultBrokerConfig()
-	config.PersistenceEnabled = *persistence
-	config.PersistenceDir = *persistenceDir
+	var broker mq.BrokerInterface
 
-	broker := mq.NewBroker(config)
-	defer broker.Close()
+	if *brokerURL != "" {
+		// Use HTTP broker to connect to remote collector
+		log.Printf("Connecting to remote broker at: %s", *brokerURL)
+		broker = mq.NewHTTPBroker(*brokerURL)
+	} else {
+		// Use local broker (original behavior)
+		log.Println("Using local message broker")
+		config := mq.DefaultBrokerConfig()
+		config.PersistenceEnabled = *persistence
+		config.PersistenceDir = *persistenceDir
+		localBroker := mq.NewBroker(config)
+		defer localBroker.Close()
+		broker = localBroker
+	}
 
 	// Create the streamer
 	s := streamer.NewStreamer(*csvPath, *workers, *rate, broker)

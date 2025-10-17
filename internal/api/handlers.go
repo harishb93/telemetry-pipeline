@@ -2,7 +2,9 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -13,14 +15,30 @@ import (
 
 // Handlers contains HTTP request handlers for the API
 type Handlers struct {
-	collector *collector.Collector
+	collector    *collector.Collector
+	collectorURL string // URL to the collector service
 }
 
 // NewHandlers creates a new handlers instance
 func NewHandlers(collector *collector.Collector) *Handlers {
-	return &Handlers{
-		collector: collector,
+	// Get collector URL from environment, default to localhost for local development
+	collectorURL := os.Getenv("COLLECTOR_URL")
+	if collectorURL == "" {
+		collectorURL = "http://telemetry-collector:8080"
 	}
+
+	return &Handlers{
+		collector:    collector,
+		collectorURL: collectorURL,
+	}
+}
+
+// CollectorStats represents the stats returned by the collector service
+type CollectorStats struct {
+	GPUEntryCounts   map[string]int `json:"gpu_entry_counts"`
+	MaxEntriesPerGPU int            `json:"max_entries_per_gpu"`
+	TotalEntries     int            `json:"total_entries"`
+	TotalGPUs        int            `json:"total_gpus"`
 }
 
 // GPUResponse represents the response for GPU list endpoint
@@ -204,12 +222,21 @@ func (h *Handlers) Health(w http.ResponseWriter, r *http.Request) {
 		"service":   "telemetry-api",
 	}
 
-	// Add collector health status
-	if h.collector != nil {
-		memStats := h.collector.GetMemoryStats()
+	// Add collector health status by fetching from collector service
+	if stats, err := h.getCollectorStats(); err == nil {
 		health["collector"] = map[string]interface{}{
-			"status":       "healthy",
-			"memory_stats": memStats,
+			"status": "healthy",
+			"memory_stats": map[string]interface{}{
+				"gpu_entry_counts":    stats.GPUEntryCounts,
+				"max_entries_per_gpu": stats.MaxEntriesPerGPU,
+				"total_entries":       stats.TotalEntries,
+				"total_gpus":          stats.TotalGPUs,
+			},
+		}
+	} else {
+		health["collector"] = map[string]interface{}{
+			"status": "unhealthy",
+			"error":  err.Error(),
 		}
 	}
 
@@ -274,38 +301,65 @@ func (h *Handlers) parseTimeRange(r *http.Request) (*time.Time, *time.Time, erro
 	return startTime, endTime, nil
 }
 
-func (h *Handlers) getAllGPUIDs() ([]string, error) {
-	// Get GPU IDs from memory storage
-	memoryGPUs := h.collector.GetMemoryStats()
-	gpuCountsInterface, ok := memoryGPUs["gpu_entry_counts"]
-	if !ok {
-		return []string{}, nil
+// getCollectorStats fetches stats from the collector service via HTTP
+func (h *Handlers) getCollectorStats() (*CollectorStats, error) {
+	resp, err := http.Get(h.collectorURL + "/stats")
+	if err != nil {
+		return nil, fmt.Errorf("failed to call collector stats endpoint: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("collector stats endpoint returned status %d", resp.StatusCode)
 	}
 
-	gpuCounts, ok := gpuCountsInterface.(map[string]int)
-	if !ok {
-		return []string{}, nil
+	var stats CollectorStats
+	if err := json.NewDecoder(resp.Body).Decode(&stats); err != nil {
+		return nil, fmt.Errorf("failed to decode collector stats response: %w", err)
+	}
+
+	return &stats, nil
+}
+
+func (h *Handlers) getAllGPUIDs() ([]string, error) {
+	// Get GPU IDs from collector service via HTTP
+	stats, err := h.getCollectorStats()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get collector stats: %w", err)
 	}
 
 	var gpuIDs []string
-	for gpuID := range gpuCounts {
+	for gpuID := range stats.GPUEntryCounts {
 		gpuIDs = append(gpuIDs, gpuID)
 	}
-
-	// TODO: Also get GPU IDs from file storage if needed
-	// This would require adding a method to the collector to access file storage
 
 	return gpuIDs, nil
 }
 
 func (h *Handlers) getTelemetryData(gpuID string, startTime, endTime *time.Time, limit, offset int) ([]*collector.Telemetry, error) {
-	// Get telemetry from memory storage first
-	// Note: The current collector only supports memory storage queries with basic limit
-	// For a production system, we'd want to enhance this to support time range filtering
+	// Get telemetry data from collector service via HTTP
+	url := fmt.Sprintf("%s/api/v1/gpus/%s/telemetry", h.collectorURL, gpuID)
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call collector telemetry endpoint: %w", err)
+	}
+	defer resp.Body.Close()
 
-	// Get data from memory storage
-	allData := h.collector.GetTelemetryForGPU(gpuID, 0) // Get all data first
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("collector telemetry endpoint returned status %d", resp.StatusCode)
+	}
 
+	var response struct {
+		Data  []*collector.Telemetry `json:"data"`
+		Total int                    `json:"total"`
+		GpuID string                 `json:"gpu_id"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode collector telemetry response: %w", err)
+	}
+
+	allData := response.Data
 	if len(allData) == 0 {
 		return nil, nil // No error, just no data
 	}

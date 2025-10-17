@@ -15,7 +15,9 @@ if [ -n "$CSV_FILE" ]; then
 fi
 
 if [ -n "$BROKER_PORT" ]; then
-    ARGS="$ARGS -broker-port=$BROKER_PORT"
+    # Construct broker URL from collector service and port
+    BROKER_URL="http://telemetry-collector:$BROKER_PORT"
+    ARGS="$ARGS -broker-url=$BROKER_URL"
 fi
 
 if [ -n "$RATE" ]; then

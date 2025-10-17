@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -179,18 +180,20 @@ func (c *Collector) handleMessage(workerID int, msg mq.Message) error {
 		return fmt.Errorf("failed to convert message: %w", err)
 	}
 
-	// Persist to file storage
-	if err := c.fileStorage.WriteTelemetry(telemetry); err != nil {
-		log.Printf("Worker %d: Failed to write to file storage: %v", workerID, err)
-		// Continue processing even if file write fails
-	}
-
-	// Store in memory
+	// Convert to persistence.Telemetry for file storage
 	persistenceTelemetry := persistence.Telemetry{
 		GPUId:     telemetry.GPUId,
 		Metrics:   telemetry.Metrics,
 		Timestamp: telemetry.Timestamp,
 	}
+
+	// Persist to file storage
+	if err := c.fileStorage.WriteTelemetry(persistenceTelemetry); err != nil {
+		log.Printf("Worker %d: Failed to write to file storage: %v", workerID, err)
+		// Continue processing even if file write fails
+	}
+
+	// Store in memory
 	c.memoryStorage.StoreTelemetry(persistenceTelemetry)
 
 	return nil
@@ -209,13 +212,38 @@ func (c *Collector) convertToTelemetry(msg StreamerMessage) (*Telemetry, error) 
 	}
 
 	// Extract GPU ID and metrics from fields
-	for key, value := range msg.Fields {
-		if key == "gpu_id" {
-			if gpuID, ok := value.(string); ok {
-				telemetry.GPUId = gpuID
+	// Handle DCGM format - use uuid as the primary identifier
+	if uuidRaw, exists := msg.Fields["uuid"]; exists {
+		// Use the UUID directly as the GPU identifier
+		if uuidStr, ok := uuidRaw.(string); ok {
+			telemetry.GPUId = uuidStr
+		}
+	} else if gpuIDRaw, exists := msg.Fields["gpu_id"]; exists {
+		// Fallback to gpu_id if uuid is not available
+		if gpuIDStr, ok := gpuIDRaw.(string); ok {
+			telemetry.GPUId = fmt.Sprintf("gpu-%03s", gpuIDStr)
+		} else if gpuIDFloat, ok := gpuIDRaw.(float64); ok {
+			telemetry.GPUId = fmt.Sprintf("gpu-%03.0f", gpuIDFloat)
+		}
+	}
+
+	// Extract the main metric value
+	if valueRaw, exists := msg.Fields["value"]; exists {
+		if floatVal, err := convertToFloat64(valueRaw); err == nil {
+			// Determine metric name from metric_name field
+			metricName := "value" // default
+			if metricNameRaw, exists := msg.Fields["metric_name"]; exists {
+				if metricNameStr, ok := metricNameRaw.(string); ok {
+					metricName = metricNameStr
+				}
 			}
-		} else {
-			// Try to convert other fields to float64 metrics
+			telemetry.Metrics[metricName] = floatVal
+		}
+	}
+
+	// Also include other numeric fields as metrics
+	for key, value := range msg.Fields {
+		if key != "gpu_id" && key != "value" && key != "metric_name" {
 			if floatVal, err := convertToFloat64(value); err == nil {
 				telemetry.Metrics[key] = floatVal
 			}
@@ -224,7 +252,7 @@ func (c *Collector) convertToTelemetry(msg StreamerMessage) (*Telemetry, error) 
 
 	// Validate that we have a GPU ID
 	if telemetry.GPUId == "" {
-		return nil, fmt.Errorf("missing gpu_id in telemetry data")
+		return nil, fmt.Errorf("missing uuid or gpu_id in telemetry data")
 	}
 
 	return telemetry, nil
@@ -277,6 +305,44 @@ func (c *Collector) startHealthServer() error {
 		stats := c.memoryStorage.GetStats()
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(stats)
+	})
+
+	// Telemetry endpoint for specific GPU
+	mux.HandleFunc("/api/v1/gpus/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		// Parse GPU ID from URL path: /api/v1/gpus/{gpu_id}/telemetry
+		path := r.URL.Path
+		if len(path) < 15 { // Minimum: "/api/v1/gpus/x/"
+			http.Error(w, "Invalid GPU ID", http.StatusBadRequest)
+			return
+		}
+
+		// Extract GPU ID and check for telemetry suffix
+		parts := strings.Split(strings.Trim(path, "/"), "/")
+		if len(parts) < 4 || parts[0] != "api" || parts[1] != "v1" || parts[2] != "gpus" {
+			http.Error(w, "Invalid path format", http.StatusBadRequest)
+			return
+		}
+
+		gpuID := parts[3]
+		if len(parts) > 4 && parts[4] != "telemetry" {
+			http.Error(w, "Invalid endpoint", http.StatusBadRequest)
+			return
+		}
+
+		// Get telemetry data for the GPU
+		telemetryData := c.GetTelemetryForGPU(gpuID, 100) // Get last 100 entries
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"data":   telemetryData,
+			"total":  len(telemetryData),
+			"gpu_id": gpuID,
+		})
 	})
 
 	c.healthServer = &http.Server{

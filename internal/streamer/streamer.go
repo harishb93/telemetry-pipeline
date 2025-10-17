@@ -25,14 +25,14 @@ type Streamer struct {
 	csvPath string
 	workers int
 	rate    float64
-	broker  *mq.Broker
+	broker  mq.BrokerInterface
 	ctx     context.Context
 	cancel  context.CancelFunc
 	wg      sync.WaitGroup
 }
 
 // NewStreamer creates a new streamer instance
-func NewStreamer(csvPath string, workers int, rate float64, broker *mq.Broker) *Streamer {
+func NewStreamer(csvPath string, workers int, rate float64, broker mq.BrokerInterface) *Streamer {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Streamer{
 		csvPath: csvPath,

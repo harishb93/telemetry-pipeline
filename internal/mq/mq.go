@@ -405,6 +405,39 @@ func (b *Broker) StartAdminServer(port string) error {
 		json.NewEncoder(w).Encode(map[string]string{"status": "healthy"})
 	})
 
+	// Publish endpoint for HTTP clients
+	mux.HandleFunc("/publish/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		topicName := r.URL.Path[len("/publish/"):]
+		if topicName == "" {
+			http.Error(w, "Topic name required", http.StatusBadRequest)
+			return
+		}
+
+		var payload json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+			return
+		}
+
+		msg := Message{
+			Payload: []byte(payload),
+			Ack:     func() {}, // No-op for HTTP clients
+		}
+
+		if err := b.Publish(topicName, msg); err != nil {
+			http.Error(w, fmt.Sprintf("Failed to publish: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "published"})
+	})
+
 	// Topic-specific stats endpoint
 	mux.HandleFunc("/stats/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
