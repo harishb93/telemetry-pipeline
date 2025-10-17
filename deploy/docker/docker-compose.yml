@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # Telemetry Collector - Core data processing service
+  telemetry-collector:
+    image: localhost:5000/telemetry-collector:latest
+    container_name: telemetry-collector
+    ports:
+      - "8080:8080"    # Health endpoint
+      - "9000:9000"    # Message broker
+      - "9091:9091"    # Metrics endpoint
+    environment:
+      - WORKERS=4
+      - DATA_DIR=/data
+      - MAX_ENTRIES=10000
+      - HEALTH_PORT=8080
+      - BROKER_PORT=9000
+      - CHECKPOINT_ENABLED=true
+    volumes:
+      - collector-data:/data
+      - collector-mq:/var/lib/mq
+    networks:
+      - telemetry
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # Telemetry Streamer - Data ingestion service (runs on each node)
+  telemetry-streamer:
+    image: localhost:5000/telemetry-streamer:latest
+    container_name: telemetry-streamer
+    environment:
+      - CSV_FILE=/data/telemetry.csv
+      - BROKER_PORT=9000
+      - RATE=10.0
+      - WORKERS=2
+    volumes:
+      # Mount sample CSV data (create this file first)
+      - ./sample-data/telemetry.csv:/data/telemetry.csv:ro
+    depends_on:
+      telemetry-collector:
+        condition: service_healthy
+    networks:
+      - telemetry
+    restart: unless-stopped
+
+  # API Gateway - REST API service
+  api-gateway:
+    image: localhost:5000/api-gateway:latest
+    container_name: api-gateway
+    ports:
+      - "8081:8081"    # HTTP API
+      - "9092:9092"    # Metrics endpoint
+    environment:
+      - PORT=8081
+      - DATA_DIR=/data
+      - COLLECTOR_PORT=8080
+    volumes:
+      - collector-data:/data:ro
+    depends_on:
+      telemetry-collector:
+        condition: service_healthy
+    networks:
+      - telemetry
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8081/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  # Persistent storage for collected telemetry data
+  collector-data:
+    driver: local
+  
+  # Persistent storage for message queue data
+  collector-mq:
+    driver: local
+
+networks:
+  # Internal network for service communication
+  telemetry:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

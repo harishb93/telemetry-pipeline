@@ -1,0 +1,31 @@
+{{- if and .Values.streamer.enabled .Values.streamer.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "telemetry-pipeline.fullname" . }}-streamer-pvc
+  labels:
+    {{- include "telemetry-pipeline.streamer.labels" . | nindent 4 }}
+  {{- with .Values.streamer.persistence.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- range .Values.streamer.persistence.accessModes }}
+    - {{ . | quote }}
+    {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.streamer.persistence.size | quote }}
+  {{- if .Values.streamer.persistence.storageClass }}
+  {{- if (eq "-" .Values.streamer.persistence.storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: {{ .Values.streamer.persistence.storageClass | quote }}
+  {{- end }}
+  {{- end }}
+  {{- if .Values.streamer.persistence.selector }}
+  selector:
+    {{- toYaml .Values.streamer.persistence.selector | nindent 4 }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,25 @@
+{{- if .Values.collector.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "telemetry-pipeline.fullname" . }}-collector-config
+  labels:
+    {{- include "telemetry-pipeline.collector.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    workers: {{ .Values.collector.workers }}
+    data_dir: "/data"
+    max_entries_per_gpu: {{ .Values.collector.maxEntriesPerGPU }}
+    checkpoint_enabled: {{ .Values.collector.checkpointEnabled }}
+    health_port: {{ .Values.collector.healthPort }}
+    broker:
+      port: {{ .Values.mq.port }}
+      topics: {{ .Values.mq.topics | toJson }}
+      persistence: {{ .Values.mq.persistence.enabled }}
+      {{- if .Values.mq.persistence.enabled }}
+      persistence_dir: {{ .Values.mq.persistence.dir }}
+      {{- end }}
+    {{- if .Values.collector.config }}
+    {{- .Values.collector.config | toYaml | nindent 4 }}
+    {{- end }}
+{{- end }}

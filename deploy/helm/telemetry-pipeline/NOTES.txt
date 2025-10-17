@@ -1,0 +1,91 @@
+🚀 Telemetry Pipeline has been installed successfully!
+
+{{- if .Values.apiGateway.enabled }}
+
+🌐 API Gateway:
+{{- if .Values.apiGateway.ingress.enabled }}
+{{- range $host := .Values.apiGateway.ingress.hosts }}
+  External URL: http{{ if $.Values.apiGateway.ingress.tls }}s{{ end }}://{{ $host.host }}{{ index $host.paths 0 "path" }}
+{{- end }}
+{{- else if contains "NodePort" .Values.apiGateway.service.type }}
+  Get the API Gateway URL by running:
+    export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "telemetry-pipeline.fullname" . }}-api-gateway)
+    export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+    echo http://$NODE_IP:$NODE_PORT
+{{- else if contains "LoadBalancer" .Values.apiGateway.service.type }}
+  Get the API Gateway URL by running:
+     NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+           You can watch the status of by running 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "telemetry-pipeline.fullname" . }}-api-gateway'
+    export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "telemetry-pipeline.fullname" . }}-api-gateway --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+    echo http://$SERVICE_IP:{{ .Values.apiGateway.service.port }}
+{{- else if contains "ClusterIP" .Values.apiGateway.service.type }}
+  Get the API Gateway URL by running:
+    kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "telemetry-pipeline.fullname" . }}-api-gateway 8081:{{ .Values.apiGateway.service.port }}
+    echo "Visit http://127.0.0.1:8081 to use your API Gateway"
+{{- end }}
+
+📚 API Documentation:
+  Swagger UI: http://[API_URL]/swagger/
+  OpenAPI Spec: http://[API_URL]/swagger/swagger.json
+
+🔍 API Endpoints:
+  - GET /health - Health check
+  - GET /api/v1/gpus - List GPUs with pagination
+  - GET /api/v1/gpus/{id}/telemetry - Get GPU telemetry data
+
+{{- end }}
+
+{{- if .Values.collector.enabled }}
+
+📊 Telemetry Collector:
+{{- if contains "NodePort" .Values.collector.service.type }}
+  Health endpoint: http://NODE_IP:{{ .Values.collector.service.healthNodePort | default "30080" }}/health
+{{- else if contains "LoadBalancer" .Values.collector.service.type }}
+  Health endpoint: http://EXTERNAL_IP:{{ .Values.collector.service.healthPort }}/health
+{{- else }}
+  Health endpoint (port-forward): kubectl port-forward svc/{{ include "telemetry-pipeline.fullname" . }}-collector 8080:{{ .Values.collector.service.healthPort }}
+{{- end }}
+  Workers: {{ .Values.collector.workers }}
+  Max entries per GPU: {{ .Values.collector.maxEntriesPerGPU }}
+{{- end }}
+
+{{- if .Values.streamer.enabled }}
+
+🔄 Telemetry Streamer:
+  Running as DaemonSet on all nodes
+  Workers per node: {{ .Values.streamer.workers }}
+  Rate: {{ .Values.streamer.rate }} messages/sec per worker
+{{- end }}
+
+📈 Monitoring:
+{{- if .Values.monitoring.serviceMonitor.enabled }}
+  ✅ Prometheus ServiceMonitor enabled
+{{- else }}
+  To enable Prometheus monitoring, set monitoring.serviceMonitor.enabled=true
+{{- end }}
+
+🔧 Useful Commands:
+
+  # View all components
+  kubectl get all -l app.kubernetes.io/instance={{ .Release.Name }}
+
+  # Check component logs
+  kubectl logs -l app.kubernetes.io/component=collector -f
+  kubectl logs -l app.kubernetes.io/component=streamer -f
+  kubectl logs -l app.kubernetes.io/component=api-gateway -f
+
+  # Check persistent volumes
+  kubectl get pvc -l app.kubernetes.io/instance={{ .Release.Name }}
+
+  # Scale components
+  kubectl scale deployment {{ include "telemetry-pipeline.fullname" . }}-collector --replicas=3
+  kubectl scale deployment {{ include "telemetry-pipeline.fullname" . }}-api-gateway --replicas=5
+
+📋 Configuration:
+  Release: {{ .Release.Name }}
+  Namespace: {{ .Release.Namespace }}
+  Chart Version: {{ .Chart.Version }}
+  App Version: {{ .Chart.AppVersion }}
+
+For more information and configuration options, visit:
+https://github.com/harishb93/telemetry-pipeline
