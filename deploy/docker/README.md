@@ -2,6 +2,28 @@
 
 This directory contains Docker configurations for building and deploying the telemetry pipeline components.
 
+## Quick Start
+
+Get the entire telemetry pipeline running in 3 commands:
+
+```bash
+# 1. Build all images locally
+docker compose up -d --build
+
+# 2. Wait a few seconds for services to start, then check health
+curl http://localhost:8081/health
+
+# 3. Query the API
+curl http://localhost:8081/api/v1/gpus
+
+# Stop everything
+docker compose down
+```
+
+That's it! All three components (Streamer, Collector, API Gateway) will be running with proper networking and data persistence.
+
+For more control or to use the registry, see [Building Images](#building-images) below.
+
 ## Components
 
 ### 1. Telemetry Streamer
@@ -59,72 +81,41 @@ docker build -f deploy/docker/api-gateway.Dockerfile -t api-gateway:latest .
 
 ### Using Docker Compose (Recommended)
 
-Create a `docker-compose.yml` file:
+A pre-configured `docker-compose.yml` is included in this directory with all services configured with proper networking, volumes, and health checks.
 
-```yaml
-version: '3.8'
-
-services:
-  telemetry-collector:
-    image: localhost:5000/telemetry-collector:latest
-    ports:
-      - "8080:8080"
-      - "9000:9000"
-      - "9091:9091"
-    environment:
-      - WORKERS=4
-      - DATA_DIR=/data
-      - HEALTH_PORT=8080
-      - BROKER_PORT=9000
-      - CHECKPOINT_ENABLED=true
-    volumes:
-      - collector-data:/data
-    networks:
-      - telemetry
-
-  telemetry-streamer:
-    image: localhost:5000/telemetry-streamer:latest
-    environment:
-      - CSV_FILE=/data/telemetry.csv
-      - BROKER_PORT=9000
-      - RATE=10.0
-      - WORKERS=2
-    volumes:
-      - ./sample-data/telemetry.csv:/data/telemetry.csv:ro
-    depends_on:
-      - telemetry-collector
-    networks:
-      - telemetry
-
-  api-gateway:
-    image: localhost:5000/api-gateway:latest
-    ports:
-      - "8081:8081"
-      - "9092:9092"
-    environment:
-      - PORT=8081
-      - DATA_DIR=/data
-      - COLLECTOR_PORT=8080
-    volumes:
-      - collector-data:/data:ro
-    depends_on:
-      - telemetry-collector
-    networks:
-      - telemetry
-
-volumes:
-  collector-data:
-
-networks:
-  telemetry:
-    driver: bridge
-```
-
-Run the stack:
+Start the entire stack with:
 
 ```bash
-docker-compose up -d
+# Build and start all services
+docker compose up -d --build
+
+# View logs
+docker compose logs -f
+
+# Stop the stack
+docker compose down
 ```
+
+Or use the provided setup script:
+
+```bash
+# Build and start all services
+./deploy/docker/setup.sh
+
+# Start services in background
+./deploy/docker/setup.sh -d
+
+# View logs
+./deploy/docker/setup.sh -l
+```
+
+The `docker-compose.yml` includes:
+- **Build contexts**: Images are automatically built from Dockerfiles
+- **Networking**: Custom bridge network for service-to-service communication
+- **Volumes**: Persistent data storage for the collector
+- **Health checks**: Automatic service monitoring
+- **Environment variables**: Configured for optimal performance
+- **Dependencies**: Proper startup order with `depends_on`
 
 ### Using Docker Run (Individual Containers)
 
@@ -255,8 +246,8 @@ vim internal/api/handlers.go
 ./deploy/docker/build-and-push.sh -t dev
 
 # Update running containers
-docker-compose down
-docker-compose up -d
+docker compose down
+docker compose up -d --build
 ```
 
 ### 3. Debug Containers
@@ -265,33 +256,46 @@ docker-compose up -d
 # View logs
 docker logs telemetry-collector -f
 docker logs api-gateway -f
+docker compose logs -f
 
-# Execute shell in container (if using alpine base)
+# Execute shell in container (alpine provides /bin/sh)
 docker exec -it telemetry-collector /bin/sh
 
 # Inspect container
 docker inspect telemetry-collector
+
+# Check container processes
+docker top telemetry-collector
+
+# View resource usage
+docker stats telemetry-collector
 ```
 
 ## Production Considerations
 
 ### 1. Multi-stage Build Optimization
 
-The Dockerfiles use multi-stage builds with distroless base images for:
-- **Security**: Minimal attack surface with no shell or package manager
-- **Size**: Smaller image size (~10-20MB vs 100MB+ with full OS)
+The Dockerfiles use multi-stage builds for:
+- **Security**: Minimal attack surface using Alpine Linux with non-root user
+- **Size**: Smaller image size (~150-200MB runtime with Alpine vs 500MB+ with full OS)
 - **Performance**: Faster image pulls and container startup
+
+Base images:
+- **Build stage**: `golang:1.25-alpine` - Includes Go toolchain and compilers
+- **Runtime stage**: `alpine:3.18` - Minimal Linux with shell support for configuration scripts
 
 ### 2. Security Features
 
-- **Non-root user**: All containers run as `nonroot:nonroot`
-- **Read-only filesystem**: Containers use read-only root filesystem
-- **Distroless base**: No shell or unnecessary binaries
+- **Non-root user**: All containers run as `nonroot:nonroot` (uid:gid 1000:1000)
+- **Read-only entrypoint**: Configuration scripts run before application startup
+- **Alpine base**: Minimal attack surface, security-focused Linux distribution
+- **CA certificates**: Included for HTTPS connections
+- **No package manager**: Reduces attack surface after container builds
 - **CA certificates**: Included for HTTPS connections
 
 ### 3. Resource Limits
 
-Add resource limits in production:
+Add resource limits in production docker-compose.yml:
 
 ```yaml
 services:
@@ -304,6 +308,13 @@ services:
         reservations:
           cpus: '0.25'
           memory: 512M
+```
+
+Or use Make targets:
+
+```bash
+# Deploy with resource limits (see Makefile for details)
+make docker-deploy
 ```
 
 ### 4. Monitoring and Logging
@@ -320,58 +331,273 @@ services:
 
 ## Troubleshooting
 
-### Common Issues
+### Common Issues and Solutions
 
-1. **Registry not accessible**
-   ```bash
-   # Check registry status
-   docker ps | grep registry
-   curl http://localhost:5000/v2/
-   ```
+#### 1. **`docker compose up -d` fails immediately**
 
-2. **Build failures**
-   ```bash
-   # Check Docker daemon
-   docker info
-   
-   # Clean build cache
-   docker builder prune
-   ```
+**Symptom**: Services start but containers crash or won't stay running
 
-3. **Container startup issues**
-   ```bash
-   # Check logs
-   docker logs <container-name>
-   
-   # Check entrypoint script permissions
-   ls -la deploy/docker/entrypoint-*.sh
-   ```
+**Solutions**:
+```bash
+# Check container logs
+docker compose logs -f
 
-4. **Network connectivity**
-   ```bash
-   # Check container networking
-   docker network ls
-   docker inspect <container-name>
-   ```
+# Verify images built successfully
+docker images | grep telemetry
+
+# Check if services exited
+docker compose ps
+
+# Re-run with build
+docker compose up -d --build
+
+# Check for permission errors in entrypoint scripts
+ls -la deploy/docker/entrypoint-*.sh
+chmod +x deploy/docker/entrypoint-*.sh
+```
+
+#### 2. **`port is already allocated` error**
+
+**Symptom**: Error when starting docker-compose: `bind: address already in use`
+
+**Solutions**:
+```bash
+# Find and stop existing containers
+docker ps | grep telemetry
+docker stop <container-id>
+
+# Or change ports in docker-compose.override.yml
+cp docker-compose.yml docker-compose.override.yml
+# Edit docker-compose.override.yml to use different ports (e.g., 8082:8081)
+
+# Check which process is using the port
+lsof -i :8081
+```
+
+#### 3. **Registry not accessible**
+
+**Symptom**: `error pulling image configuration` or `failed to pull image from registry`
+
+**Solutions**:
+```bash
+# Start the registry
+docker run -d -p 5000:5000 --name kind-registry \
+  -v /tmp/registry:/var/lib/registry \
+  registry:2
+
+# Verify registry is running
+curl http://localhost:5000/v2/
+
+# Build and push images to registry
+./deploy/docker/build-and-push.sh
+
+# Check what's in registry
+curl http://localhost:5000/v2/_catalog | jq .
+```
+
+#### 4. **Build failures with Alpine base image**
+
+**Symptom**: Build errors related to missing packages or tools
+
+**Solutions**:
+```bash
+# Clean build cache
+docker builder prune
+
+# Build with full output for debugging
+docker compose build --no-cache telemetry-collector
+
+# Check Dockerfile syntax
+docker run --rm -i hadolint/hadolint < deploy/docker/telemetry-collector.Dockerfile
+
+# For Alpine-specific issues, ensure apk commands are in RUN statements
+# (Multi-line RUN prevents layer explosion)
+```
+
+#### 5. **Shell script permission errors in container**
+
+**Symptom**: `Permission denied` when entrypoint.sh runs
+
+**Solutions**:
+```bash
+# Ensure entrypoint scripts have executable permissions on host
+chmod +x deploy/docker/entrypoint-*.sh
+
+# Verify they're copied correctly in Dockerfile
+docker exec -it telemetry-collector ls -la /entrypoint.sh
+
+# Test entrypoint directly
+docker exec -it telemetry-collector /bin/sh /entrypoint.sh
+```
+
+#### 6. **Network connectivity between services**
+
+**Symptom**: Services can't communicate (e.g., `telemetry-collector` can't connect to broker)
+
+**Solutions**:
+```bash
+# Check Docker network
+docker network ls
+docker network inspect telemetry-pipeline_telemetry
+
+# Verify service DNS resolution
+docker exec telemetry-collector nslookup telemetry-collector
+docker exec telemetry-streamer nslookup telemetry-collector
+
+# Test connectivity with curl inside container
+docker exec -it telemetry-streamer wget -O- http://telemetry-collector:8080/health
+
+# Check depends_on order
+docker compose ps  # Should start collector first
+```
+
+#### 7. **Data persistence issues**
+
+**Symptom**: Data lost after `docker compose down`
+
+**Solutions**:
+```bash
+# Verify volumes are defined
+docker volume ls | grep telemetry
+
+# Backup volume data
+docker run -v telemetry-pipeline_collector-data:/data \
+  -v $(pwd):/backup alpine tar czf /backup/data.tar.gz -C / data
+
+# Check volume permissions
+docker exec -it telemetry-collector ls -la /data
+
+# Mount volume with correct permissions
+# Ensure docker-compose.yml has: volumes: - collector-data:/data
+```
+
+### Debug Workflows
+
+#### View Complete Logs
+```bash
+# All services
+docker compose logs -f
+
+# Specific service
+docker compose logs -f telemetry-collector
+
+# Last 50 lines
+docker compose logs --tail=50 telemetry-collector
+
+# With timestamps
+docker compose logs -f --timestamps telemetry-collector
+```
+
+#### Shell Access for Debugging
+```bash
+# Open shell in running container
+docker exec -it telemetry-collector /bin/sh
+
+# Inside the shell, useful commands:
+ps aux                          # See running processes
+netstat -tlnp                   # Check listening ports
+ls -la /                        # Verify file structure
+cat /entrypoint.sh              # View entrypoint script
+env | sort                      # View all environment variables
+```
+
+#### Inspect Container Details
+```bash
+# Full container information
+docker inspect telemetry-collector
+
+# Just network settings
+docker inspect -f '{{json .NetworkSettings}}' telemetry-collector | jq .
+
+# Environment variables set in container
+docker inspect -f '{{json .Config.Env}}' telemetry-collector | jq .
+
+# Entry point/command
+docker inspect -f '{{json .Config.Cmd}}' telemetry-collector | jq .
+```
+
+#### Monitor Resource Usage
+```bash
+# Real-time stats for all containers
+docker stats
+
+# Specific container
+docker stats telemetry-collector
+
+# Store stats over time
+docker stats --no-stream > docker-stats.log
+```
 
 ### Performance Tuning
 
-1. **Build performance**
-   ```bash
-   # Use buildkit for faster builds
-   export DOCKER_BUILDKIT=1
-   docker build ...
-   ```
+#### 1. **Build Performance**
+```bash
+# Use BuildKit for faster builds (up to 10x faster)
+export DOCKER_BUILDKIT=1
+docker compose build
 
-2. **Runtime performance**
-   ```bash
-   # Monitor container resources
-   docker stats
-   
-   # Check container metrics
-   curl http://localhost:9091/metrics  # collector
-   curl http://localhost:9092/metrics  # api-gateway
-   ```
+# Or in docker-compose.yml
+version: '3.8'
+services:
+  telemetry-collector:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/telemetry-collector.Dockerfile
+      # BuildKit options for faster builds
+```
+
+#### 2. **Runtime Performance**
+```bash
+# Check container resource limits
+docker stats --no-stream
+
+# Monitor metrics endpoints
+curl http://localhost:9091/metrics  # collector
+curl http://localhost:9092/metrics  # api-gateway
+
+# Analyze slow operations
+docker exec telemetry-collector /bin/sh
+time curl http://localhost:8080/health
+```
+
+#### 3. **Image Size Optimization**
+```bash
+# Check current image sizes
+docker images | grep telemetry
+
+# Analyze layers
+docker history telemetry-collector:latest
+
+# Remove build cache to reduce stored images
+docker builder prune
+
+# View detailed image content
+docker run --rm telemetry-collector:latest sh -c "du -sh /"
+```
+
+### Integration with Make
+
+Use the Makefile for simplified management:
+
+```bash
+# View all Docker-related targets
+make help | grep -i docker
+
+# Build all images
+make docker-build
+
+# Run Docker Compose stack
+make docker-deploy
+
+# Stop the stack
+make docker-down
+
+# View logs
+docker compose logs -f
+
+# Clean up
+docker compose down -v
+```
 
 ## Integration with Kubernetes
 

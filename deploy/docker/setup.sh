@@ -82,7 +82,7 @@ EOF
     fi
     
     # Start services
-    docker-compose up -d
+    docker compose up -d
     
     log_success "Services started successfully!"
     
@@ -97,7 +97,7 @@ EOF
 # Stop services
 stop_services() {
     log_info "Stopping telemetry pipeline services..."
-    docker-compose down -v
+    docker compose down -v
     log_success "Services stopped successfully!"
 }
 
@@ -127,7 +127,7 @@ check_services() {
         log_success "All services are healthy!"
         show_endpoints
     else
-        log_warning "Some services are not healthy. Check logs with: docker-compose logs"
+        log_warning "Some services are not healthy. Check logs with: docker compose logs"
     fi
 }
 
@@ -147,15 +147,15 @@ show_endpoints() {
     echo "  📊 GPU Telemetry:     curl http://localhost:8081/api/v1/gpus/gpu-001/telemetry"
     echo ""
     log_info "Management commands:"
-    echo "  📋 View logs:         docker-compose logs -f"
+    echo "  📋 View logs:         docker compose logs -f"
     echo "  🛑 Stop services:     $0 -d"
-    echo "  🔄 Restart:           docker-compose restart"
+    echo "  🔄 Restart:           docker compose restart"
 }
 
 # Show logs
 show_logs() {
     log_info "Showing service logs (Press Ctrl+C to exit)..."
-    docker-compose logs -f
+    docker compose logs -f
 }
 
 # Main function

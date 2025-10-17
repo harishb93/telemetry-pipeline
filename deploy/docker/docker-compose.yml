@@ -1,8 +1,9 @@
-version: '3.8'
-
 services:
   # Telemetry Collector - Core data processing service
   telemetry-collector:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/telemetry-collector.Dockerfile
     image: localhost:5000/telemetry-collector:latest
     container_name: telemetry-collector
     ports:
@@ -31,6 +32,9 @@ services:
 
   # Telemetry Streamer - Data ingestion service (runs on each node)
   telemetry-streamer:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/telemetry-streamer.Dockerfile
     image: localhost:5000/telemetry-streamer:latest
     container_name: telemetry-streamer
     environment:
@@ -50,6 +54,9 @@ services:
 
   # API Gateway - REST API service
   api-gateway:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/api-gateway.Dockerfile
     image: localhost:5000/api-gateway:latest
     container_name: api-gateway
     ports:
