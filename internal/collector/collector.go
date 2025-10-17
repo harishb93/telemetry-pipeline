@@ -18,6 +18,7 @@ import (
 // Telemetry represents a typed telemetry data point
 type Telemetry struct {
 	GPUId     string             `json:"gpu_id"`
+	Hostname  string             `json:"hostname"`
 	Metrics   map[string]float64 `json:"metrics"`
 	Timestamp time.Time          `json:"timestamp"`
 }
@@ -183,6 +184,7 @@ func (c *Collector) handleMessage(workerID int, msg mq.Message) error {
 	// Convert to persistence.Telemetry for file storage
 	persistenceTelemetry := persistence.Telemetry{
 		GPUId:     telemetry.GPUId,
+		Hostname:  telemetry.Hostname,
 		Metrics:   telemetry.Metrics,
 		Timestamp: telemetry.Timestamp,
 	}
@@ -226,6 +228,13 @@ func (c *Collector) convertToTelemetry(msg StreamerMessage) (*Telemetry, error) 
 		} else if gpuIDFloat, ok := gpuIDRaw.(float64); ok {
 			// If it's a number, format it as gpu-xxx
 			telemetry.GPUId = fmt.Sprintf("gpu-%03.0f", gpuIDFloat)
+		}
+	}
+
+	// Extract hostname from DCGM format
+	if hostnameRaw, exists := msg.Fields["Hostname"]; exists {
+		if hostnameStr, ok := hostnameRaw.(string); ok {
+			telemetry.Hostname = hostnameStr
 		}
 	}
 
@@ -347,6 +356,59 @@ func (c *Collector) startHealthServer() error {
 		})
 	})
 
+	// Hosts endpoint
+	mux.HandleFunc("/api/v1/hosts", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		hosts := c.GetAllHosts()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"hosts": hosts,
+			"total": len(hosts),
+		})
+	})
+
+	// Host GPUs endpoint
+	mux.HandleFunc("/api/v1/hosts/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		// Parse hostname from URL path: /api/v1/hosts/{hostname}/gpus
+		path := r.URL.Path
+		if len(path) < 16 { // Minimum: "/api/v1/hosts/x/"
+			http.Error(w, "Invalid hostname", http.StatusBadRequest)
+			return
+		}
+
+		// Extract hostname and check for gpus suffix
+		parts := strings.Split(strings.Trim(path, "/"), "/")
+		if len(parts) < 4 || parts[0] != "api" || parts[1] != "v1" || parts[2] != "hosts" {
+			http.Error(w, "Invalid path format", http.StatusBadRequest)
+			return
+		}
+
+		hostname := parts[3]
+		if len(parts) > 4 && parts[4] != "gpus" {
+			http.Error(w, "Invalid endpoint", http.StatusBadRequest)
+			return
+		}
+
+		// Get GPUs for the host
+		gpus := c.GetGPUsForHost(hostname)
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"hostname": hostname,
+			"gpus":     gpus,
+			"total":    len(gpus),
+		})
+	})
+
 	c.healthServer = &http.Server{
 		Addr:    ":" + c.config.HealthPort,
 		Handler: mux,
@@ -379,10 +441,21 @@ func (c *Collector) GetTelemetryForGPU(gpuID string, limit int) []*Telemetry {
 		}
 		tel := &Telemetry{
 			GPUId:     pTel.GPUId,
+			Hostname:  pTel.Hostname,
 			Metrics:   pTel.Metrics,
 			Timestamp: pTel.Timestamp,
 		}
 		result = append(result, tel)
 	}
 	return result
+}
+
+// GetAllHosts returns all unique hostnames that have telemetry data
+func (c *Collector) GetAllHosts() []string {
+	return c.memoryStorage.GetAllHosts()
+}
+
+// GetGPUsForHost returns all GPU IDs associated with a specific hostname
+func (c *Collector) GetGPUsForHost(hostname string) []string {
+	return c.memoryStorage.GetGPUsForHost(hostname)
 }

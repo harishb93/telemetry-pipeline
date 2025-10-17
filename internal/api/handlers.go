@@ -55,6 +55,20 @@ type TelemetryResponse struct {
 	Pagination PaginationMetadata     `json:"pagination"`
 }
 
+// HostsResponse represents the response for hosts list endpoint
+type HostsResponse struct {
+	Hosts      []string           `json:"hosts"`
+	Total      int                `json:"total"`
+	Pagination PaginationMetadata `json:"pagination"`
+}
+
+// HostGPUsResponse represents the response for host GPUs endpoint
+type HostGPUsResponse struct {
+	Hostname string   `json:"hostname"`
+	GPUs     []string `json:"gpus"`
+	Total    int      `json:"total"`
+}
+
 // PaginationMetadata represents pagination information
 type PaginationMetadata struct {
 	Limit   int  `json:"limit"`
@@ -201,6 +215,102 @@ func (h *Handlers) GetTelemetry(w http.ResponseWriter, r *http.Request) {
 			Offset:  offset,
 			HasNext: offset+limit < total,
 		},
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, response)
+}
+
+// GetHosts returns a list of all hosts with available telemetry data
+// @Summary Get all host names
+// @Description Returns a list of all hostnames for which telemetry data is available
+// @Tags Hosts
+// @Accept json
+// @Produce json
+// @Param limit query int false "Number of items to return (default: 100, max: 1000)"
+// @Param offset query int false "Number of items to skip (default: 0)"
+// @Success 200 {object} HostsResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /hosts [get]
+func (h *Handlers) GetHosts(w http.ResponseWriter, r *http.Request) {
+	// Parse pagination parameters
+	limit, offset, err := h.parsePagination(r)
+	if err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Invalid pagination parameters", err.Error())
+		return
+	}
+
+	// Get hosts from collector service
+	hosts, err := h.getAllHosts()
+	if err != nil {
+		h.writeErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve hosts", err.Error())
+		return
+	}
+
+	// Apply pagination
+	total := len(hosts)
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+
+	var paginatedHosts []string
+	if offset < total {
+		paginatedHosts = hosts[offset:end]
+	} else {
+		paginatedHosts = []string{}
+	}
+
+	response := HostsResponse{
+		Hosts: paginatedHosts,
+		Total: total,
+		Pagination: PaginationMetadata{
+			Limit:   limit,
+			Offset:  offset,
+			HasNext: offset+limit < total,
+		},
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, response)
+}
+
+// GetHostGPUs returns GPU IDs for a specific host
+// @Summary Get GPU IDs for a host
+// @Description Returns a list of GPU UUIDs associated with the specified hostname
+// @Tags Hosts
+// @Accept json
+// @Produce json
+// @Param hostname path string true "Hostname"
+// @Success 200 {object} HostGPUsResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /hosts/{hostname}/gpus [get]
+func (h *Handlers) GetHostGPUs(w http.ResponseWriter, r *http.Request) {
+	// Extract hostname from URL path
+	vars := mux.Vars(r)
+	hostname := vars["hostname"]
+
+	if hostname == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Missing hostname", "Hostname is required")
+		return
+	}
+
+	// Get GPUs for the host from collector service
+	gpus, err := h.getGPUsForHost(hostname)
+	if err != nil {
+		if err.Error() == "no data found for host" {
+			h.writeErrorResponse(w, http.StatusNotFound, "Host not found", "No telemetry data found for hostname: "+hostname)
+			return
+		}
+		h.writeErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve GPUs for host", err.Error())
+		return
+	}
+
+	response := HostGPUsResponse{
+		Hostname: hostname,
+		GPUs:     gpus,
+		Total:    len(gpus),
 	}
 
 	h.writeJSONResponse(w, http.StatusOK, response)
@@ -398,6 +508,58 @@ func (h *Handlers) getTelemetryData(gpuID string, startTime, endTime *time.Time,
 	}
 
 	return filteredData[offset:end], nil
+}
+
+// Helper method to get all hosts from collector service
+func (h *Handlers) getAllHosts() ([]string, error) {
+	url := fmt.Sprintf("%s/api/v1/hosts", h.collectorURL)
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call collector hosts endpoint: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("collector hosts endpoint returned status %d", resp.StatusCode)
+	}
+
+	var response struct {
+		Hosts []string `json:"hosts"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode hosts response: %w", err)
+	}
+
+	return response.Hosts, nil
+}
+
+// Helper method to get GPUs for a specific host from collector service
+func (h *Handlers) getGPUsForHost(hostname string) ([]string, error) {
+	url := fmt.Sprintf("%s/api/v1/hosts/%s/gpus", h.collectorURL, hostname)
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call collector host GPUs endpoint: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("no data found for host")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("collector host GPUs endpoint returned status %d", resp.StatusCode)
+	}
+
+	var response struct {
+		GPUs []string `json:"gpus"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode host GPUs response: %w", err)
+	}
+
+	return response.GPUs, nil
 }
 
 func (h *Handlers) writeJSONResponse(w http.ResponseWriter, statusCode int, data interface{}) {

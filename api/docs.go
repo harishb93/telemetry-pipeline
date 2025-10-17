@@ -54,19 +54,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api.GPUResponse"
+                            "$ref": "#/definitions/api.GPUResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                            "$ref": "#/definitions/api.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                            "$ref": "#/definitions/api.ErrorResponse"
                         }
                     }
                 }
@@ -122,25 +122,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api.TelemetryResponse"
+                            "$ref": "#/definitions/api.TelemetryResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                            "$ref": "#/definitions/api.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                            "$ref": "#/definitions/api.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                            "$ref": "#/definitions/api.ErrorResponse"
                         }
                     }
                 }
@@ -169,28 +169,109 @@ const docTemplate = `{
                     }
                 }
             }
-        }
-    },
-    "definitions": {
-        "github_com_harishb93_telemetry-pipeline_internal_collector.Telemetry": {
-            "type": "object",
-            "properties": {
-                "gpu_id": {
-                    "type": "string"
-                },
-                "metrics": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "number",
-                        "format": "float64"
+        },
+        "/hosts": {
+            "get": {
+                "description": "Returns a list of all hostnames for which telemetry data is available",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Hosts"
+                ],
+                "summary": "Get all host names",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Number of items to return (default: 100, max: 1000)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of items to skip (default: 0)",
+                        "name": "offset",
+                        "in": "query"
                     }
-                },
-                "timestamp": {
-                    "type": "string"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.HostsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    }
                 }
             }
         },
-        "internal_api.ErrorResponse": {
+        "/hosts/{hostname}/gpus": {
+            "get": {
+                "description": "Returns a list of GPU UUIDs associated with the specified hostname",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Hosts"
+                ],
+                "summary": "Get GPU IDs for a host",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Hostname",
+                        "name": "hostname",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.HostGPUsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "api.ErrorResponse": {
             "type": "object",
             "properties": {
                 "code": {
@@ -204,7 +285,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api.GPUResponse": {
+        "api.GPUResponse": {
             "type": "object",
             "properties": {
                 "gpus": {
@@ -214,14 +295,48 @@ const docTemplate = `{
                     }
                 },
                 "pagination": {
-                    "$ref": "#/definitions/internal_api.PaginationMetadata"
+                    "$ref": "#/definitions/api.PaginationMetadata"
                 },
                 "total": {
                     "type": "integer"
                 }
             }
         },
-        "internal_api.PaginationMetadata": {
+        "api.HostGPUsResponse": {
+            "type": "object",
+            "properties": {
+                "gpus": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "hostname": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.HostsResponse": {
+            "type": "object",
+            "properties": {
+                "hosts": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/api.PaginationMetadata"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.PaginationMetadata": {
             "type": "object",
             "properties": {
                 "has_next": {
@@ -235,20 +350,41 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api.TelemetryResponse": {
+        "api.TelemetryResponse": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_harishb93_telemetry-pipeline_internal_collector.Telemetry"
+                        "$ref": "#/definitions/collector.Telemetry"
                     }
                 },
                 "pagination": {
-                    "$ref": "#/definitions/internal_api.PaginationMetadata"
+                    "$ref": "#/definitions/api.PaginationMetadata"
                 },
                 "total": {
                     "type": "integer"
+                }
+            }
+        },
+        "collector.Telemetry": {
+            "type": "object",
+            "properties": {
+                "gpu_id": {
+                    "type": "string"
+                },
+                "hostname": {
+                    "type": "string"
+                },
+                "metrics": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number",
+                        "format": "float64"
+                    }
+                },
+                "timestamp": {
+                    "type": "string"
                 }
             }
         }

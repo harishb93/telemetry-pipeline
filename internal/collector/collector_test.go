@@ -385,3 +385,133 @@ func BenchmarkTelemetryConversion(b *testing.B) {
 		}
 	}
 }
+
+// TestGetAllHosts tests the GetAllHosts method
+func TestGetAllHosts(t *testing.T) {
+	config := CollectorConfig{
+		Workers:           1,
+		DataDir:           "/tmp/test",
+		MaxEntriesPerGPU:  100,
+		CheckpointEnabled: false,
+		HealthPort:        "8084",
+	}
+
+	broker := mq.NewBroker(mq.DefaultBrokerConfig())
+	collector := NewCollector(broker, config)
+
+	// Initially should be empty
+	hosts := collector.GetAllHosts()
+	if len(hosts) != 0 {
+		t.Errorf("Expected 0 hosts initially, got %d", len(hosts))
+	}
+
+	// Add telemetry data with different hostnames
+	testData := []struct {
+		hostname string
+		gpuID    string
+	}{
+		{"host1", "gpu_0"},
+		{"host1", "gpu_1"},
+		{"host2", "gpu_2"},
+		{"host3", "gpu_3"},
+	}
+
+	for _, data := range testData {
+		telemetry := persistence.Telemetry{
+			GPUId:     data.gpuID,
+			Hostname:  data.hostname,
+			Metrics:   map[string]float64{"temperature": 75.5},
+			Timestamp: time.Now(),
+		}
+		collector.memoryStorage.StoreTelemetry(telemetry)
+	}
+
+	// Check hosts
+	hosts = collector.GetAllHosts()
+	expectedHosts := 3
+	if len(hosts) != expectedHosts {
+		t.Errorf("Expected %d hosts, got %d", expectedHosts, len(hosts))
+	}
+
+	// Verify unique hostnames
+	hostSet := make(map[string]bool)
+	for _, host := range hosts {
+		if hostSet[host] {
+			t.Errorf("Duplicate host found: %s", host)
+		}
+		hostSet[host] = true
+	}
+
+	// Verify expected hostnames are present
+	expectedHostnames := []string{"host1", "host2", "host3"}
+	for _, expected := range expectedHostnames {
+		if !hostSet[expected] {
+			t.Errorf("Expected hostname %s not found in results", expected)
+		}
+	}
+}
+
+// TestGetGPUsForHost tests the GetGPUsForHost method
+func TestGetGPUsForHost(t *testing.T) {
+	config := CollectorConfig{
+		Workers:           1,
+		DataDir:           "/tmp/test",
+		MaxEntriesPerGPU:  100,
+		CheckpointEnabled: false,
+		HealthPort:        "8085",
+	}
+
+	broker := mq.NewBroker(mq.DefaultBrokerConfig())
+	collector := NewCollector(broker, config)
+
+	// Add telemetry data
+	testData := []struct {
+		hostname string
+		gpuID    string
+	}{
+		{"host1", "gpu_0"},
+		{"host1", "gpu_1"},
+		{"host1", "gpu_2"},
+		{"host2", "gpu_3"},
+		{"host2", "gpu_4"},
+	}
+
+	for _, data := range testData {
+		telemetry := persistence.Telemetry{
+			GPUId:     data.gpuID,
+			Hostname:  data.hostname,
+			Metrics:   map[string]float64{"temperature": 75.5},
+			Timestamp: time.Now(),
+		}
+		collector.memoryStorage.StoreTelemetry(telemetry)
+	}
+
+	// Test getting GPUs for host1
+	gpus := collector.GetGPUsForHost("host1")
+	expectedGPUs := 3
+	if len(gpus) != expectedGPUs {
+		t.Errorf("Expected %d GPUs for host1, got %d", expectedGPUs, len(gpus))
+	}
+
+	// Verify unique GPU IDs
+	gpuSet := make(map[string]bool)
+	for _, gpu := range gpus {
+		if gpuSet[gpu] {
+			t.Errorf("Duplicate GPU found for host1: %s", gpu)
+		}
+		gpuSet[gpu] = true
+	}
+
+	// Test getting GPUs for host2
+	gpus = collector.GetGPUsForHost("host2")
+	expectedGPUs = 2
+	if len(gpus) != expectedGPUs {
+		t.Errorf("Expected %d GPUs for host2, got %d", expectedGPUs, len(gpus))
+	}
+
+	// Test getting GPUs for non-existent host
+	gpus = collector.GetGPUsForHost("non-existent-host")
+	if len(gpus) != 0 {
+		t.Errorf("Expected 0 GPUs for non-existent host, got %d", len(gpus))
+	}
+}

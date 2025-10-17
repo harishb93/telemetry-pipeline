@@ -542,6 +542,159 @@ func TestParseTimeRange(t *testing.T) {
 }
 
 // Benchmark tests
+func TestGetHosts(t *testing.T) {
+	handlers, cleanup := createTestHandlers(t)
+	defer cleanup()
+
+	tests := []struct {
+		name           string
+		queryParams    string
+		expectedStatus int
+		checkResponse  func(t *testing.T, response HostsResponse)
+	}{
+		{
+			name:           "Get all hosts",
+			queryParams:    "",
+			expectedStatus: http.StatusOK,
+			checkResponse: func(t *testing.T, response HostsResponse) {
+				if response.Total < 0 {
+					t.Errorf("Expected non-negative total, got %d", response.Total)
+				}
+				if response.Pagination.Limit != 100 {
+					t.Errorf("Expected default limit 100, got %d", response.Pagination.Limit)
+				}
+				// Check that Hosts is a slice of strings
+				if response.Hosts == nil {
+					t.Error("Expected hosts slice, got nil")
+				}
+			},
+		},
+		{
+			name:           "Get hosts with pagination",
+			queryParams:    "?limit=10&offset=0",
+			expectedStatus: http.StatusOK,
+			checkResponse: func(t *testing.T, response HostsResponse) {
+				if response.Pagination.Limit != 10 {
+					t.Errorf("Expected limit 10, got %d", response.Pagination.Limit)
+				}
+				if response.Pagination.Offset != 0 {
+					t.Errorf("Expected offset 0, got %d", response.Pagination.Offset)
+				}
+			},
+		},
+		{
+			name:           "Get hosts with invalid limit",
+			queryParams:    "?limit=invalid",
+			expectedStatus: http.StatusBadRequest,
+			checkResponse:  nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := http.NewRequest("GET", "/api/v1/hosts"+tt.queryParams, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			rr := httptest.NewRecorder()
+			handler := http.HandlerFunc(handlers.GetHosts)
+			handler.ServeHTTP(rr, req)
+
+			if status := rr.Code; status != tt.expectedStatus {
+				t.Errorf("handler returned wrong status code: got %v want %v", status, tt.expectedStatus)
+			}
+
+			if tt.expectedStatus == http.StatusOK && tt.checkResponse != nil {
+				var response HostsResponse
+				if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+					t.Fatalf("Could not parse response: %v", err)
+				}
+				tt.checkResponse(t, response)
+			}
+		})
+	}
+}
+
+func TestGetHostGPUs(t *testing.T) {
+	handlers, cleanup := createTestHandlers(t)
+	defer cleanup()
+
+	tests := []struct {
+		name           string
+		hostname       string
+		expectedStatus int
+		checkResponse  func(t *testing.T, response HostGPUsResponse)
+	}{
+		{
+			name:           "Get GPUs for existing host",
+			hostname:       "test-host",
+			expectedStatus: http.StatusOK,
+			checkResponse: func(t *testing.T, response HostGPUsResponse) {
+				if response.Hostname != "test-host" {
+					t.Errorf("Expected hostname 'test-host', got '%s'", response.Hostname)
+				}
+				if response.Total < 0 {
+					t.Errorf("Expected non-negative total, got %d", response.Total)
+				}
+				if response.GPUs == nil {
+					t.Error("Expected GPUs slice, got nil")
+				}
+			},
+		},
+		{
+			name:           "Get GPUs for non-existent host",
+			hostname:       "non-existent-host",
+			expectedStatus: http.StatusOK,
+			checkResponse: func(t *testing.T, response HostGPUsResponse) {
+				if response.Hostname != "non-existent-host" {
+					t.Errorf("Expected hostname 'non-existent-host', got '%s'", response.Hostname)
+				}
+				if response.Total != 0 {
+					t.Errorf("Expected total 0 for non-existent host, got %d", response.Total)
+				}
+				if len(response.GPUs) != 0 {
+					t.Errorf("Expected empty GPUs slice for non-existent host, got %d GPUs", len(response.GPUs))
+				}
+			},
+		},
+		{
+			name:           "Get GPUs with empty hostname gets redirected",
+			hostname:       "",
+			expectedStatus: http.StatusMovedPermanently,
+			checkResponse:  nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := http.NewRequest("GET", "/api/v1/hosts/"+tt.hostname+"/gpus", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			rr := httptest.NewRecorder()
+
+			// Use mux router to handle path parameters
+			router := mux.NewRouter()
+			router.HandleFunc("/api/v1/hosts/{hostname}/gpus", handlers.GetHostGPUs).Methods("GET")
+			router.ServeHTTP(rr, req)
+
+			if status := rr.Code; status != tt.expectedStatus {
+				t.Errorf("handler returned wrong status code: got %v want %v", status, tt.expectedStatus)
+			}
+
+			if tt.expectedStatus == http.StatusOK && tt.checkResponse != nil {
+				var response HostGPUsResponse
+				if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+					t.Fatalf("Could not parse response: %v", err)
+				}
+				tt.checkResponse(t, response)
+			}
+		})
+	}
+}
+
 func BenchmarkGetGPUs(b *testing.B) {
 	coll := createTestCollector()
 	handlers := NewHandlers(coll)

@@ -44,6 +44,8 @@ func (s *Server) Start() error {
 	v1 := router.PathPrefix("/api/v1").Subrouter()
 	v1.HandleFunc("/gpus", handlers.GetGPUs).Methods("GET")
 	v1.HandleFunc("/gpus/{id}/telemetry", handlers.GetTelemetry).Methods("GET")
+	v1.HandleFunc("/hosts", handlers.GetHosts).Methods("GET")
+	v1.HandleFunc("/hosts/{hostname}/gpus", handlers.GetHostGPUs).Methods("GET")
 
 	// Health endpoint
 	router.HandleFunc("/health", handlers.Health).Methods("GET")

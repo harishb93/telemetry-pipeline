@@ -196,6 +196,7 @@ func (fs *FileStorage) GetFileStats() (map[string]interface{}, error) {
 // Telemetry represents a typed telemetry data point
 type Telemetry struct {
 	GPUId     string             `json:"gpu_id"`
+	Hostname  string             `json:"hostname"`
 	Metrics   map[string]float64 `json:"metrics"`
 	Timestamp time.Time          `json:"timestamp"`
 }

@@ -159,3 +159,46 @@ func (ms *MemoryStorage) ClearOldEntries(olderThan time.Duration) {
 		ms.data[gpuID] = newEntries
 	}
 }
+
+// GetAllHosts returns all unique hostnames that have telemetry data
+func (ms *MemoryStorage) GetAllHosts() []string {
+	ms.mu.RLock()
+	defer ms.mu.RUnlock()
+
+	hostsMap := make(map[string]bool)
+	for _, entries := range ms.data {
+		for _, entry := range entries {
+			if entry.Hostname != "" {
+				hostsMap[entry.Hostname] = true
+			}
+		}
+	}
+
+	hosts := make([]string, 0, len(hostsMap))
+	for host := range hostsMap {
+		hosts = append(hosts, host)
+	}
+	return hosts
+}
+
+// GetGPUsForHost returns all GPU IDs associated with a specific hostname
+func (ms *MemoryStorage) GetGPUsForHost(hostname string) []string {
+	ms.mu.RLock()
+	defer ms.mu.RUnlock()
+
+	gpusMap := make(map[string]bool)
+	for gpuID, entries := range ms.data {
+		for _, entry := range entries {
+			if entry.Hostname == hostname {
+				gpusMap[gpuID] = true
+				break // Found this GPU on the host, no need to check more entries
+			}
+		}
+	}
+
+	gpus := make([]string, 0, len(gpusMap))
+	for gpu := range gpusMap {
+		gpus = append(gpus, gpu)
+	}
+	return gpus
+}

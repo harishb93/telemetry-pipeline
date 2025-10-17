@@ -18,6 +18,8 @@ func TestSystemEndToEnd(t *testing.T) {
 	t.Run("CollectorStats", suite.testCollectorStats)
 	t.Run("APIGatewayGPUs", suite.testAPIGatewayGPUs)
 	t.Run("APIGatewayTelemetry", suite.testAPIGatewayTelemetry)
+	t.Run("APIGatewayHosts", suite.testAPIGatewayHosts)
+	t.Run("APIGatewayHostGPUs", suite.testAPIGatewayHostGPUs)
 	t.Run("DataFlowIntegration", suite.testDataFlowIntegration)
 	t.Run("APIParameters", suite.testAPIParameters)
 	t.Run("SwaggerDocumentation", suite.testSwaggerDocumentation)
@@ -263,6 +265,199 @@ func (s *SystemTestSuite) testAPIGatewayTelemetry(t *testing.T) {
 		}
 
 		t.Logf("Time-ranged telemetry: %d entries", telemetryResponse.Total)
+	})
+}
+
+// testAPIGatewayHosts tests the hosts listing endpoint
+func (s *SystemTestSuite) testAPIGatewayHosts(t *testing.T) {
+	t.Log("Testing API gateway hosts endpoint")
+
+	// Wait for data to flow through the system
+	time.Sleep(5 * time.Second)
+
+	t.Run("GetHosts", func(t *testing.T) {
+		resp, err := s.makeAPIRequest("GET", "/api/v1/hosts", nil)
+		if err != nil {
+			t.Fatalf("Failed to make hosts request: %v", err)
+		}
+
+		var hostsResponse struct {
+			Hosts      []string `json:"hosts"`
+			Total      int      `json:"total"`
+			Pagination struct {
+				Limit   int  `json:"limit"`
+				Offset  int  `json:"offset"`
+				HasNext bool `json:"has_next"`
+			} `json:"pagination"`
+		}
+
+		if err := s.parseJSONResponse(resp, &hostsResponse); err != nil {
+			t.Fatalf("Failed to parse hosts response: %v", err)
+		}
+
+		t.Logf("Found %d hosts: %v", hostsResponse.Total, hostsResponse.Hosts)
+
+		// Verify response structure
+		if hostsResponse.Total < 0 {
+			t.Errorf("Expected non-negative total, got %d", hostsResponse.Total)
+		}
+
+		if hostsResponse.Pagination.Limit <= 0 {
+			t.Errorf("Expected positive pagination limit, got %d", hostsResponse.Pagination.Limit)
+		}
+
+		// Verify hosts are unique
+		hostSet := make(map[string]bool)
+		for _, host := range hostsResponse.Hosts {
+			if host == "" {
+				t.Error("Found empty hostname in response")
+			}
+			if hostSet[host] {
+				t.Errorf("Duplicate hostname found: %s", host)
+			}
+			hostSet[host] = true
+		}
+	})
+
+	t.Run("GetHostsWithPagination", func(t *testing.T) {
+		resp, err := s.makeAPIRequest("GET", "/api/v1/hosts?limit=2&offset=0", nil)
+		if err != nil {
+			t.Fatalf("Failed to make paginated hosts request: %v", err)
+		}
+
+		var hostsResponse struct {
+			Hosts      []string `json:"hosts"`
+			Total      int      `json:"total"`
+			Pagination struct {
+				Limit   int  `json:"limit"`
+				Offset  int  `json:"offset"`
+				HasNext bool `json:"has_next"`
+			} `json:"pagination"`
+		}
+
+		if err := s.parseJSONResponse(resp, &hostsResponse); err != nil {
+			t.Fatalf("Failed to parse paginated hosts response: %v", err)
+		}
+
+		// Verify pagination parameters
+		if hostsResponse.Pagination.Limit != 2 {
+			t.Errorf("Expected limit 2, got %d", hostsResponse.Pagination.Limit)
+		}
+
+		if hostsResponse.Pagination.Offset != 0 {
+			t.Errorf("Expected offset 0, got %d", hostsResponse.Pagination.Offset)
+		}
+
+		// Verify returned data respects pagination
+		if len(hostsResponse.Hosts) > 2 {
+			t.Errorf("Expected at most 2 hosts with limit=2, got %d", len(hostsResponse.Hosts))
+		}
+
+		t.Logf("Paginated hosts: %d returned out of %d total", len(hostsResponse.Hosts), hostsResponse.Total)
+	})
+}
+
+// testAPIGatewayHostGPUs tests the host GPUs endpoint
+func (s *SystemTestSuite) testAPIGatewayHostGPUs(t *testing.T) {
+	t.Log("Testing API gateway host GPUs endpoint")
+
+	// Wait for data to flow through the system
+	time.Sleep(5 * time.Second)
+
+	// First get hosts list to have a valid hostname
+	resp, err := s.makeAPIRequest("GET", "/api/v1/hosts", nil)
+	if err != nil {
+		t.Fatalf("Failed to get hosts list: %v", err)
+	}
+
+	var hostsResponse struct {
+		Hosts []string `json:"hosts"`
+		Total int      `json:"total"`
+	}
+
+	if err := s.parseJSONResponse(resp, &hostsResponse); err != nil {
+		t.Fatalf("Failed to parse hosts list: %v", err)
+	}
+
+	if len(hostsResponse.Hosts) == 0 {
+		t.Skip("No hosts available for host GPUs testing")
+	}
+
+	testHostname := hostsResponse.Hosts[0]
+	t.Logf("Testing GPUs for host: %s", testHostname)
+
+	t.Run("GetHostGPUs", func(t *testing.T) {
+		path := fmt.Sprintf("/api/v1/hosts/%s/gpus", testHostname)
+		resp, err := s.makeAPIRequest("GET", path, nil)
+		if err != nil {
+			t.Fatalf("Failed to make host GPUs request: %v", err)
+		}
+
+		var hostGPUsResponse struct {
+			Hostname string   `json:"hostname"`
+			GPUs     []string `json:"gpus"`
+			Total    int      `json:"total"`
+		}
+
+		if err := s.parseJSONResponse(resp, &hostGPUsResponse); err != nil {
+			t.Fatalf("Failed to parse host GPUs response: %v", err)
+		}
+
+		t.Logf("Host %s has %d GPUs: %v", hostGPUsResponse.Hostname, hostGPUsResponse.Total, hostGPUsResponse.GPUs)
+
+		// Verify response structure
+		if hostGPUsResponse.Hostname != testHostname {
+			t.Errorf("Expected hostname %s, got %s", testHostname, hostGPUsResponse.Hostname)
+		}
+
+		if hostGPUsResponse.Total < 0 {
+			t.Errorf("Expected non-negative total, got %d", hostGPUsResponse.Total)
+		}
+
+		if hostGPUsResponse.Total != len(hostGPUsResponse.GPUs) {
+			t.Errorf("Total (%d) doesn't match number of GPUs returned (%d)", hostGPUsResponse.Total, len(hostGPUsResponse.GPUs))
+		}
+
+		// Verify GPUs are unique
+		gpuSet := make(map[string]bool)
+		for _, gpu := range hostGPUsResponse.GPUs {
+			if gpu == "" {
+				t.Error("Found empty GPU ID in response")
+			}
+			if gpuSet[gpu] {
+				t.Errorf("Duplicate GPU ID found: %s", gpu)
+			}
+			gpuSet[gpu] = true
+		}
+	})
+
+	t.Run("GetHostGPUsNonExistent", func(t *testing.T) {
+		path := "/api/v1/hosts/non-existent-host/gpus"
+		resp, err := s.makeAPIRequest("GET", path, nil)
+		if err != nil {
+			t.Fatalf("Failed to make non-existent host GPUs request: %v", err)
+		}
+
+		var hostGPUsResponse struct {
+			Hostname string   `json:"hostname"`
+			GPUs     []string `json:"gpus"`
+			Total    int      `json:"total"`
+		}
+
+		if err := s.parseJSONResponse(resp, &hostGPUsResponse); err != nil {
+			t.Fatalf("Failed to parse non-existent host GPUs response: %v", err)
+		}
+
+		// Should return empty list for non-existent host
+		if hostGPUsResponse.Total != 0 {
+			t.Errorf("Expected 0 GPUs for non-existent host, got %d", hostGPUsResponse.Total)
+		}
+
+		if len(hostGPUsResponse.GPUs) != 0 {
+			t.Errorf("Expected empty GPUs list for non-existent host, got %d GPUs", len(hostGPUsResponse.GPUs))
+		}
+
+		t.Logf("Non-existent host correctly returned 0 GPUs")
 	})
 }
 
