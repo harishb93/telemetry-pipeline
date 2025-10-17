@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -118,18 +119,43 @@ func createTestCollector() *collector.Collector {
 		DataDir:           "/tmp/test",
 		MaxEntriesPerGPU:  100,
 		CheckpointEnabled: false,
-		HealthPort:        "8080",
+		HealthPort:        "8899", // Use a fixed test port
 	}
 
 	return collector.NewCollector(broker, config)
 }
 
-func TestGetGPUs(t *testing.T) {
-	// Create a real collector with some test data
+// createTestHandlers creates handlers with a running collector service for testing
+func createTestHandlers(t *testing.T) (*Handlers, func()) {
 	coll := createTestCollector()
 
-	// We'll use a mock approach since the current collector doesn't expose memory storage directly
+	// Start the collector in background
+	go func() {
+		if err := coll.Start(); err != nil {
+			t.Logf("Failed to start test collector: %v", err)
+		}
+	}()
+
+	// Give it a moment to start
+	time.Sleep(200 * time.Millisecond)
+
+	// Set the collector URL to point to our test collector
+	os.Setenv("COLLECTOR_URL", "http://localhost:8899")
 	handlers := NewHandlers(coll)
+
+	// Return cleanup function
+	cleanup := func() {
+		coll.Stop()
+		os.Unsetenv("COLLECTOR_URL")
+	}
+
+	return handlers, cleanup
+}
+
+func TestGetGPUs(t *testing.T) {
+	// Create a real collector with some test data
+	handlers, cleanup := createTestHandlers(t)
+	defer cleanup()
 
 	tests := []struct {
 		name           string
@@ -201,8 +227,8 @@ func TestGetGPUs(t *testing.T) {
 }
 
 func TestGetTelemetry(t *testing.T) {
-	coll := createTestCollector()
-	handlers := NewHandlers(coll)
+	handlers, cleanup := createTestHandlers(t)
+	defer cleanup()
 
 	tests := []struct {
 		name           string
@@ -297,8 +323,8 @@ func TestGetTelemetry(t *testing.T) {
 }
 
 func TestHealth(t *testing.T) {
-	coll := createTestCollector()
-	handlers := NewHandlers(coll)
+	handlers, cleanup := createTestHandlers(t)
+	defer cleanup()
 
 	req, err := http.NewRequest("GET", "/health", nil)
 	if err != nil {

@@ -262,8 +262,11 @@ func TestCheckpointManager(t *testing.T) {
 	broker := mq.NewBroker(mq.DefaultBrokerConfig())
 	collector := NewCollector(broker, config)
 
-	// Test updating processed count
+	// Clean up any existing checkpoint data for isolation
 	checkpointName := "worker-1"
+	collector.checkpointMgr.DeleteCheckpoint(checkpointName)
+
+	// Test updating processed count
 	err := collector.checkpointMgr.UpdateProcessedCount(checkpointName, 100)
 	if err != nil {
 		t.Fatalf("Failed to update processed count: %v", err)

@@ -221,8 +221,10 @@ func (c *Collector) convertToTelemetry(msg StreamerMessage) (*Telemetry, error) 
 	} else if gpuIDRaw, exists := msg.Fields["gpu_id"]; exists {
 		// Fallback to gpu_id if uuid is not available
 		if gpuIDStr, ok := gpuIDRaw.(string); ok {
-			telemetry.GPUId = fmt.Sprintf("gpu-%03s", gpuIDStr)
+			// Use the gpu_id as-is if it's already in the expected format
+			telemetry.GPUId = gpuIDStr
 		} else if gpuIDFloat, ok := gpuIDRaw.(float64); ok {
+			// If it's a number, format it as gpu-xxx
 			telemetry.GPUId = fmt.Sprintf("gpu-%03.0f", gpuIDFloat)
 		}
 	}
