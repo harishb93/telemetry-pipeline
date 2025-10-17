@@ -1,0 +1,4 @@
+timestamp,metric_name,gpu_id,uuid,hostname,model_name,value,labels
+2025-10-17T10:00:00Z,utilization,0,uuid-0,host-0,model-0,50.5,label1=value1;label2=value2
+2025-10-17T10:01:00Z,utilization,1,uuid-1,host-1,model-1,60.0,label1=value3;label2=value4
+2025-10-17T10:02:00Z,utilization,2,uuid-2,host-2,model-2,70.0,label1=value5;label2=value6
