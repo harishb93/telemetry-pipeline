@@ -15,6 +15,7 @@
 # Build directories
 build/
 dist/
+bin/
 
 # Dependency directories
 vendor/
