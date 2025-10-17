@@ -125,7 +125,7 @@ func (s *SystemTestSuite) testCollectorToAPIFlow(t *testing.T) {
 	if len(apiGPUResponse.GPUs) > 0 {
 		testGPUID := apiGPUResponse.GPUs[0]
 		telemetryPath := fmt.Sprintf("/api/v1/gpus/%s/telemetry", testGPUID)
-		
+
 		telemetryResp, err := s.makeAPIRequest("GET", telemetryPath, nil)
 		if err != nil {
 			t.Fatalf("Failed to get telemetry for GPU %s: %v", testGPUID, err)
@@ -150,7 +150,7 @@ func (s *SystemTestSuite) testEndToEndDataJourney(t *testing.T) {
 
 	// Record initial state
 	t.Log("Recording initial state...")
-	
+
 	collectorResp, err := s.makeCollectorRequest("GET", "/stats")
 	if err != nil {
 		t.Fatalf("Failed to get initial collector stats: %v", err)
@@ -183,7 +183,7 @@ func (s *SystemTestSuite) testEndToEndDataJourney(t *testing.T) {
 
 	// Record final state
 	t.Log("Recording final state...")
-	
+
 	collectorResp, err = s.makeCollectorRequest("GET", "/stats")
 	if err != nil {
 		t.Fatalf("Failed to get final collector stats: %v", err)
@@ -210,7 +210,7 @@ func (s *SystemTestSuite) testEndToEndDataJourney(t *testing.T) {
 	collectorEntriesAdded := finalCollectorEntries - initialCollectorEntries
 	apiGPUsAdded := finalAPIGPUs - initialAPIGPUs
 
-	t.Logf("Final state: collector has %.0f entries (+%.0f), API has %d GPUs (+%d)", 
+	t.Logf("Final state: collector has %.0f entries (+%.0f), API has %d GPUs (+%d)",
 		finalCollectorEntries, collectorEntriesAdded, finalAPIGPUs, apiGPUsAdded)
 
 	// Verify end-to-end flow
@@ -230,7 +230,7 @@ func (s *SystemTestSuite) testEndToEndDataJourney(t *testing.T) {
 	if len(finalAPIResponse.GPUs) > 0 {
 		testGPUID := finalAPIResponse.GPUs[0]
 		telemetryPath := fmt.Sprintf("/api/v1/gpus/%s/telemetry?limit=5", testGPUID)
-		
+
 		telemetryResp, err := s.makeAPIRequest("GET", telemetryPath, nil)
 		if err != nil {
 			t.Fatalf("Failed to get telemetry sample: %v", err)
@@ -243,7 +243,7 @@ func (s *SystemTestSuite) testEndToEndDataJourney(t *testing.T) {
 
 		if len(telemetryResponse.Data) > 0 {
 			t.Logf("✅ End-to-end data retrieval verified: retrieved %d telemetry entries", len(telemetryResponse.Data))
-			
+
 			// Verify data structure
 			entry := telemetryResponse.Data[0]
 			if gpuID, exists := entry["gpu_id"]; exists {
@@ -412,7 +412,7 @@ func (s *SystemTestSuite) testDataConsistencyAcrossServices(t *testing.T) {
 	// Test telemetry data consistency for a specific GPU
 	if len(apiResponse.GPUs) > 0 {
 		testGPUID := apiResponse.GPUs[0]
-		
+
 		// Get telemetry from collector
 		collectorTelemetryResp, err := s.makeCollectorRequest("GET", fmt.Sprintf("/api/v1/gpus/%s/telemetry", testGPUID))
 		if err != nil {
