@@ -6,13 +6,16 @@ TAG ?= latest
 HELM_RELEASE ?= telemetry-pipeline
 HELM_NAMESPACE ?= default
 
-.PHONY: help build test coverage clean clean-docker openapi-gen docker-build docker-push docker-deploy helm-install helm-uninstall helm-status run-collector run-streamer run-api lint deps all deploy dev ci registry-start registry-stop registry-status
+.PHONY: help build test coverage clean clean-docker openapi-gen docker-build docker-push docker-deploy helm-install helm-uninstall helm-status run-collector run-streamer run-api lint deps all deploy dev ci registry-start registry-stop registry-status system-tests system-tests-quick system-tests-performance
 
 # Default target
 help:
 	@echo "Available targets:"
 	@echo "  build         - Build all binaries"
-	@echo "  test          - Run all tests with coverage"
+	@echo "  test          - Run unit and integration tests with coverage"
+	@echo "  system-tests  - Run comprehensive system tests (end-to-end)"
+	@echo "  system-tests-quick - Run quick system tests (functional only)"
+	@echo "  system-tests-performance - Run performance system tests"
 	@echo "  coverage      - Generate coverage report"
 	@echo "  docker-build  - Build Docker images (TAG=$(TAG))"
 	@echo "  docker-push   - Push Docker images to registry ($(REGISTRY))"
@@ -48,8 +51,8 @@ build-api:
 
 # Test targets
 test:
-	@echo "Running tests with coverage..."
-	go test ./... -v -coverprofile=coverage.out
+	@echo "Running unit and integration tests with coverage..."
+	go test ./... -v -coverprofile=coverage.out -tags="!system"
 	@echo "Coverage profile saved to coverage.out"
 
 coverage: test
@@ -57,6 +60,34 @@ coverage: test
 	go tool cover -html=coverage.out -o coverage.html
 	go tool cover -func=coverage.out
 	@echo "Coverage report generated: coverage.html"
+
+# System test targets
+system-tests: build
+	@echo "Running comprehensive system tests..."
+	@echo "This will test end-to-end functionality with all components"
+	@echo "Building required binaries first..."
+	@make build-collector build-streamer build-api >/dev/null 2>&1
+	@echo "Starting system test suite..."
+	cd tests && go test -v -timeout=10m -tags=system \
+		-run="TestSystem|TestFunctional|TestPerformance|TestIntegration" \
+		./...
+	@echo "System tests completed!"
+
+system-tests-quick: build
+	@echo "Running quick system tests (functional only)..."
+	@make build-collector build-streamer build-api >/dev/null 2>&1
+	cd tests && go test -v -timeout=5m -tags=system \
+		-run="TestSystemEndToEnd|TestSystemIntegration" \
+		./...
+	@echo "Quick system tests completed!"
+
+system-tests-performance: build
+	@echo "Running performance system tests..."
+	@make build-collector build-streamer build-api >/dev/null 2>&1
+	cd tests && go test -v -timeout=15m -tags=system \
+		-run="TestSystemPerformance" \
+		./...
+	@echo "Performance tests completed!"
 
 # OpenAPI generation
 openapi-gen:
