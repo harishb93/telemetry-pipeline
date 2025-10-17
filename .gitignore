@@ -39,9 +39,6 @@ vendor/
 *.cover
 coverage.out
 
-# Generated API documentation
-/api/
-
 # Old demo files
 /examples/
 demo.sh

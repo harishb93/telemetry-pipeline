@@ -10,6 +10,7 @@ import (
 	"github.com/harishb93/telemetry-pipeline/internal/api"
 	"github.com/harishb93/telemetry-pipeline/internal/collector"
 	"github.com/harishb93/telemetry-pipeline/internal/mq"
+	_ "github.com/harishb93/telemetry-pipeline/api" // Swagger docs
 )
 
 // @title Telemetry API Gateway
