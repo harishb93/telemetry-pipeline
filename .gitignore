@@ -7,8 +7,14 @@
 *.test
 *.out
 
+# Project binaries
+/api-gateway
+/telemetry-collector
+/telemetry-streamer
+
 # Build directories
 build/
+dist/
 
 # Dependency directories
 vendor/
@@ -32,3 +38,10 @@ vendor/
 # Coverage files
 *.cover
 coverage.out
+
+# Generated API documentation
+/api/
+
+# Old demo files
+/examples/
+demo.sh
