@@ -38,7 +38,7 @@ build-api:
 # Test targets
 test:
 	@echo "Running unit and integration tests with coverage..."
-	go test ./... -v -coverprofile=coverage.out -tags="!system"
+	GOTOOLCHAIN=local go test ./... -v -coverprofile=coverage.out -tags="!system"
 	@echo "Coverage profile saved to coverage.out"
 
 coverage: test
@@ -112,8 +112,7 @@ lint:
 	else \
 		echo "golangci-lint not found, installing..."; \
 		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh; \
-		export PATH=$$PATH:$(pwd)/bin; \
-		golangci-lint run; \
+		export PATH=$$PATH:$(CURDIR)/bin && golangci-lint run; \
 	fi
 
 clean:
