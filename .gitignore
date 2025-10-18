@@ -40,6 +40,5 @@ vendor/
 *.cover
 coverage.out
 
-# Old demo files
-/examples/
-demo.sh
+#Generated JSON files
+*.jsonl

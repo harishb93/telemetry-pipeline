@@ -401,7 +401,7 @@ func (h *Handlers) parseTimeRange(r *http.Request) (*time.Time, *time.Time, erro
 
 // getCollectorStats fetches stats from the collector service via HTTP
 func (h *Handlers) getCollectorStats() (*CollectorStats, error) {
-	resp, err := http.Get(h.collectorURL + "/health")
+	resp, err := http.Get(h.collectorURL + "/stats")
 	if err != nil {
 		return nil, err
 	}

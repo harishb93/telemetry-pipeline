@@ -42,7 +42,7 @@ services:
       - "8080:8080"    # Health endpoint
       - "9091:9091"    # Metrics endpoint
     environment:
-      - WORKERS=4
+      - WORKERS=2
       - DATA_DIR=/data
       - MAX_ENTRIES=10000
       - HEALTH_PORT=8080
@@ -78,7 +78,7 @@ services:
       - CSV_FILE=/data/telemetry.csv
       - BROKER_URL=http://mq-service:9090
       - TOPIC=telemetry
-      - RATE=10.0
+      - RATE=5.0
       - WORKERS=2
       - LOG_LEVEL=INFO
       - LOG_FORMAT=json

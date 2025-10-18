@@ -71,7 +71,18 @@ start_services() {
     
     # Create necessary directories with proper permissions
     log_info "Creating data directories..."
+    # Create directories if they do not exist
     mkdir -p data mq-data sample-data
+
+    # If data or mq-data directories exist, delete their contents
+    if [ -d "data" ]; then
+        log_info "Clearing contents of data directory..."
+        rm -rf data/*
+    fi
+    if [ -d "mq-data" ]; then
+        log_info "Clearing contents of mq-data directory..."
+        rm -rf mq-data/*
+    fi
     
     # Ensure proper ownership for Docker volumes (UID:GID 1000:1000)
     if [ "$(id -u)" = "0" ]; then
@@ -159,11 +170,11 @@ show_endpoints() {
     echo ""
     log_info "Service endpoints:"
     echo "  🏥 Collector Health:  http://localhost:8080/health"
-    echo "  📊 Collector Metrics: http://localhost:9091/metrics"
+    echo "  📊 Collector Metrics: http://localhost:8080/stats"
+    echo "  🏥 MQ Health:         http://localhost:9090/health"
     echo "  🌐 API Gateway:       http://localhost:8081"
     echo "  🏥 Gateway Health:    http://localhost:8081/health"
     echo "  📚 API Documentation: http://localhost:8081/swagger/"
-    echo "  📈 Gateway Metrics:   http://localhost:9092/metrics"
     echo ""
     log_info "API endpoints:"
     echo "  📝 List GPUs:         curl http://localhost:8081/api/v1/gpus"
