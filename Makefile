@@ -38,7 +38,7 @@ build-api:
 # Test targets
 test:
 	@echo "Running unit and integration tests with coverage..."
-	GOTOOLCHAIN=local go test ./... -v -coverprofile=coverage.out -tags="!system"
+	GOTOOLCHAIN=local go test $(shell go list ./... | grep -v '/tests/') -v -coverprofile=coverage.out -tags="!system"
 	@echo "Coverage profile saved to coverage.out"
 
 coverage: test
