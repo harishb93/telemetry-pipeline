@@ -1,4 +1,36 @@
 services:
+  # Message Queue Service - Standalone message broker
+  mq-service:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/mq-service.Dockerfile
+    image: localhost:5000/mq-service:latest
+    container_name: mq-service
+    ports:
+      - "9090:9090"    # MQ HTTP API
+      - "9092:9092"    # MQ gRPC API
+    environment:
+      - GRPC_PORT=9092
+      - HTTP_PORT=9090
+      - PERSISTENCE_ENABLED=true
+      - PERSISTENCE_DIR=/var/lib/mq
+      - MAX_RETRIES=3
+      - ACK_TIMEOUT=30s
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=json
+    volumes:
+      - mq-data:/var/lib/mq
+    networks:
+      - telemetry
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9090/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    user: "1000:1000"
+
   # Telemetry Collector - Core data processing service
   telemetry-collector:
     build:
@@ -8,20 +40,22 @@ services:
     container_name: telemetry-collector
     ports:
       - "8080:8080"    # Health endpoint
-      - "9000:9000"    # Message broker
       - "9091:9091"    # Metrics endpoint
     environment:
       - WORKERS=4
       - DATA_DIR=/data
       - MAX_ENTRIES=10000
       - HEALTH_PORT=8080
-      - BROKER_PORT=9000
+      - MQ_URL=mq-service:9092
+      - TOPIC=telemetry
       - CHECKPOINT_ENABLED=true
       - LOG_LEVEL=INFO
       - LOG_FORMAT=json
     volumes:
       - collector-data:/data
-      - collector-mq:/var/lib/mq
+    depends_on:
+      mq-service:
+        condition: service_healthy
     networks:
       - telemetry
     healthcheck:
@@ -42,7 +76,8 @@ services:
     container_name: telemetry-streamer
     environment:
       - CSV_FILE=/data/telemetry.csv
-      - BROKER_PORT=9000
+      - BROKER_URL=http://mq-service:9090
+      - TOPIC=telemetry
       - RATE=10.0
       - WORKERS=2
       - LOG_LEVEL=INFO
@@ -51,7 +86,7 @@ services:
       # Mount sample CSV data (create this file first)
       - ./sample-data/telemetry.csv:/data/telemetry.csv:ro
     depends_on:
-      telemetry-collector:
+      mq-service:
         condition: service_healthy
     networks:
       - telemetry
@@ -67,7 +102,7 @@ services:
     container_name: api-gateway
     ports:
       - "8081:8081"    # HTTP API
-      - "9092:9092"    # Metrics endpoint
+      - "9093:9093"    # Metrics endpoint
     environment:
       - PORT=8081
       - DATA_DIR=/data
@@ -78,6 +113,8 @@ services:
     volumes:
       - collector-data:/data:ro
     depends_on:
+      mq-service:
+        condition: service_healthy
       telemetry-collector:
         condition: service_healthy
     networks:
@@ -101,7 +138,7 @@ volumes:
       o: bind,uid=1000,gid=1000
   
   # Persistent storage for message queue data
-  collector-mq:
+  mq-data:
     driver: local
     driver_opts:
       type: none

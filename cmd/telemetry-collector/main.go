@@ -4,6 +4,7 @@ import (
 	"flag"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/harishb93/telemetry-pipeline/internal/collector"
@@ -39,10 +40,22 @@ func main() {
 		"mq_service_url", *mqServiceURL,
 		"mq_topic", *mqTopic)
 
-	// For now, create a local broker instance  
-	// TODO: Connect to external MQ service once subscription mechanism is implemented
-	brokerConfig := mq.DefaultBrokerConfig()
-	broker := mq.NewBroker(brokerConfig)
+	// Connect to external MQ service via gRPC
+	// Parse the MQ URL to get the gRPC address
+	grpcAddr := *mqServiceURL
+	// Default to localhost if URL is not provided
+	if grpcAddr == "http://localhost:9090" {
+		grpcAddr = "localhost:9092"
+	} else {
+		// Remove http:// prefix and use as gRPC address directly
+		grpcAddr = strings.TrimPrefix(grpcAddr, "http://")
+		// The environment variable MQ_URL should be set to gRPC address for Docker
+	}
+
+	broker, err := mq.NewGRPCBrokerClient(grpcAddr)
+	if err != nil {
+		log.Fatal("Failed to connect to MQ service via gRPC", "address", grpcAddr, "error", err)
+	}
 
 	// Create collector configuration
 	collectorConfig := collector.CollectorConfig{
@@ -55,7 +68,7 @@ func main() {
 		MQTopic:           *mqTopic,
 	}
 
-	// Create collector  
+	// Create collector
 	coll := collector.NewCollector(broker, collectorConfig)
 
 	// Set up signal handling for graceful shutdown
@@ -80,6 +93,7 @@ func main() {
 
 	// Graceful shutdown
 	coll.Stop()
+	broker.Close()
 
 	log.Info("Collector stopped successfully")
 }

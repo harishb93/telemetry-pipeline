@@ -132,9 +132,11 @@ clean:
 
 clean-docker:
 	@echo "Cleaning Docker images..."
+	-docker rmi mq-service:$(TAG) 2>/dev/null || true
 	-docker rmi telemetry-streamer:$(TAG) 2>/dev/null || true
 	-docker rmi telemetry-collector:$(TAG) 2>/dev/null || true
 	-docker rmi api-gateway:$(TAG) 2>/dev/null || true
+	-docker rmi $(REGISTRY)/mq-service:$(TAG) 2>/dev/null || true
 	-docker rmi $(REGISTRY)/telemetry-streamer:$(TAG) 2>/dev/null || true
 	-docker rmi $(REGISTRY)/telemetry-collector:$(TAG) 2>/dev/null || true
 	-docker rmi $(REGISTRY)/api-gateway:$(TAG) 2>/dev/null || true
@@ -144,10 +146,12 @@ clean-docker:
 docker-build:
 	@echo "Building Docker images with tag: $(TAG)"
 	@echo "Registry: $(REGISTRY)"
+	docker build -f deploy/docker/mq-service.Dockerfile -t mq-service:$(TAG) .
 	docker build -f deploy/docker/telemetry-streamer.Dockerfile -t telemetry-streamer:$(TAG) .
 	docker build -f deploy/docker/telemetry-collector.Dockerfile -t telemetry-collector:$(TAG) .
 	docker build -f deploy/docker/api-gateway.Dockerfile -t api-gateway:$(TAG) .
 	@echo "Tagging images for registry $(REGISTRY)..."
+	docker tag mq-service:$(TAG) $(REGISTRY)/mq-service:$(TAG)
 	docker tag telemetry-streamer:$(TAG) $(REGISTRY)/telemetry-streamer:$(TAG)
 	docker tag telemetry-collector:$(TAG) $(REGISTRY)/telemetry-collector:$(TAG)
 	docker tag api-gateway:$(TAG) $(REGISTRY)/api-gateway:$(TAG)
@@ -214,11 +218,32 @@ ci: clean deps build test coverage
 	@echo "CI pipeline completed successfully!"
 	@echo "Coverage report: coverage.html"
 
-# Quick docker deployment
-docker-deploy: docker-build
+# Docker Compose targets
+docker-up: docker-build
 	@echo "Starting services with Docker Compose..."
-	cd deploy/docker && ./setup.sh -b
+	@mkdir -p deploy/docker/data deploy/docker/mq-data
+	@chmod 755 deploy/docker/data deploy/docker/mq-data
+	cd deploy/docker && docker-compose up -d
 	@echo "Services started! Check http://localhost:8081"
+	@echo "API Gateway: http://localhost:8081"
+	@echo "MQ Service: http://localhost:9090"
+	@echo "Collector Health: http://localhost:8080/health"
+
+docker-down:
+	@echo "Stopping services with Docker Compose..."
+	cd deploy/docker && docker-compose down
+	@echo "Services stopped!"
+
+docker-logs:
+	@echo "Showing Docker Compose logs..."
+	cd deploy/docker && docker-compose logs -f
+
+docker-status:
+	@echo "Checking Docker Compose status..."
+	cd deploy/docker && docker-compose ps
+
+# Quick docker deployment (backward compatibility)
+docker-deploy: docker-up
 
 # Registry management
 registry-start:
@@ -276,6 +301,7 @@ docs:
 # Docker push target for releasing images
 docker-push:
 	@echo "Pushing Docker images to registry: $(REGISTRY)"
+	docker push $(REGISTRY)/mq-service:$(TAG)
 	docker push $(REGISTRY)/telemetry-streamer:$(TAG)
 	docker push $(REGISTRY)/telemetry-collector:$(TAG)
 	docker push $(REGISTRY)/api-gateway:$(TAG)
@@ -290,21 +316,23 @@ test-integration:
 # Show help
 help:
 	@echo "Available targets:"
-	@echo "  build             - Build all components"
+	@echo "  build             - Build all components (collector, streamer, api-gateway, mq-service)"
 	@echo "  test              - Run unit tests"
 	@echo "  test-integration  - Run integration tests"
 	@echo "  coverage          - Generate test coverage report"
 	@echo "  lint              - Run linter"
 	@echo "  clean             - Clean build artifacts"
 	@echo "  clean-docker      - Clean Docker images"
-	@echo "  docker-build      - Build Docker images"
+	@echo "  docker-build      - Build Docker images for all services"
 	@echo "  docker-push       - Push Docker images to registry"
+	@echo "  docker-up         - Start all services with Docker Compose"
+	@echo "  docker-down       - Stop Docker Compose services"
+	@echo "  docker-logs       - Show Docker Compose logs"
+	@echo "  docker-status     - Check Docker Compose status"
 	@echo "  docs              - Generate API documentation"
 	@echo "  deps              - Install dependencies"
-	@echo "  deploy            - Deploy using Docker Compose"
-	@echo "  undeploy          - Stop Docker Compose services"
-	@echo "  registry-up       - Start local Docker registry"
-	@echo "  registry-down     - Stop local Docker registry"
+	@echo "  registry-start    - Start local Docker registry"
+	@echo "  registry-stop     - Stop local Docker registry"
 	@echo "  registry-status   - Check registry status"
 	@echo "  sample-data       - Create sample test data"
 	@echo "  help              - Show this help message"

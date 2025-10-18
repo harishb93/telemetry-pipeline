@@ -3,7 +3,8 @@ set -e
 
 # Default values
 CSV_FILE=${CSV_FILE:-"/data/telemetry.csv"}
-BROKER_PORT=${BROKER_PORT:-"9000"}
+BROKER_URL=${BROKER_URL:-"http://localhost:9090"}
+TOPIC=${TOPIC:-"telemetry"}
 RATE=${RATE:-"10.0"}
 WORKERS=${WORKERS:-"2"}
 LOG_LEVEL=${LOG_LEVEL:-"INFO"}
@@ -16,10 +17,12 @@ if [ -n "$CSV_FILE" ]; then
     ARGS="$ARGS -csv-file=$CSV_FILE"
 fi
 
-if [ -n "$BROKER_PORT" ]; then
-    # Construct broker URL from collector service and port
-    BROKER_URL="http://telemetry-collector:$BROKER_PORT"
+if [ -n "$BROKER_URL" ]; then
     ARGS="$ARGS -broker-url=$BROKER_URL"
+fi
+
+if [ -n "$TOPIC" ]; then
+    ARGS="$ARGS -topic=$TOPIC"
 fi
 
 if [ -n "$RATE" ]; then

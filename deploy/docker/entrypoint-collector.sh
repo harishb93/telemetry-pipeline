@@ -6,7 +6,8 @@ WORKERS=${WORKERS:-"4"}
 DATA_DIR=${DATA_DIR:-"/data"}
 MAX_ENTRIES=${MAX_ENTRIES:-"10000"}
 HEALTH_PORT=${HEALTH_PORT:-"8080"}
-BROKER_PORT=${BROKER_PORT:-"9000"}
+MQ_URL=${MQ_URL:-"http://localhost:9090"}
+TOPIC=${TOPIC:-"telemetry"}
 CHECKPOINT_ENABLED=${CHECKPOINT_ENABLED:-"true"}
 LOG_LEVEL=${LOG_LEVEL:-"INFO"}
 LOG_FORMAT=${LOG_FORMAT:-"text"}
@@ -30,8 +31,12 @@ if [ -n "$HEALTH_PORT" ]; then
     ARGS="$ARGS -health-port=$HEALTH_PORT"
 fi
 
-if [ -n "$BROKER_PORT" ]; then
-    ARGS="$ARGS -broker-port=$BROKER_PORT"
+if [ -n "$MQ_URL" ]; then
+    ARGS="$ARGS -mq-url=$MQ_URL"
+fi
+
+if [ -n "$TOPIC" ]; then
+    ARGS="$ARGS -mq-topic=$TOPIC"
 fi
 
 if [ "$CHECKPOINT_ENABLED" = "true" ]; then

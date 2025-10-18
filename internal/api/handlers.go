@@ -318,31 +318,18 @@ func (h *Handlers) GetHostGPUs(w http.ResponseWriter, r *http.Request) {
 }
 
 // Health returns the health status of the API
-// @Summary Health check
-// @Description Returns the health status of the API service
-// @Tags Health
-// @Accept json
-// @Produce json
-// @Success 200 {object} map[string]interface{}
-// @Router /health [get]
 func (h *Handlers) Health(w http.ResponseWriter, r *http.Request) {
 	health := map[string]interface{}{
 		"status":    "healthy",
 		"timestamp": time.Now().UTC(),
 		"version":   "1.0.0",
-		"service":   "telemetry-api",
+		"service":   "telemetry-api-gateway",
 	}
 
 	// Add collector health status by fetching from collector service
-	if stats, err := h.getCollectorStats(); err == nil {
+	if _, err := h.getCollectorStats(); err == nil {
 		health["collector"] = map[string]interface{}{
 			"status": "healthy",
-			"memory_stats": map[string]interface{}{
-				"gpu_entry_counts":    stats.GPUEntryCounts,
-				"max_entries_per_gpu": stats.MaxEntriesPerGPU,
-				"total_entries":       stats.TotalEntries,
-				"total_gpus":          stats.TotalGPUs,
-			},
 		}
 	} else {
 		health["collector"] = map[string]interface{}{

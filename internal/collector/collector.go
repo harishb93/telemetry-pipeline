@@ -43,7 +43,7 @@ type CollectorConfig struct {
 // Collector handles telemetry data collection and persistence
 type Collector struct {
 	config        CollectorConfig
-	broker        *mq.Broker
+	broker        mq.BrokerInterface
 	fileStorage   *persistence.FileStorage
 	memoryStorage *persistence.MemoryStorage
 	checkpointMgr *persistence.CheckpointManager
@@ -55,7 +55,7 @@ type Collector struct {
 }
 
 // NewCollector creates a new collector instance
-func NewCollector(broker *mq.Broker, config CollectorConfig) *Collector {
+func NewCollector(broker mq.BrokerInterface, config CollectorConfig) *Collector {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	fileStorage := persistence.NewFileStorage(config.DataDir)

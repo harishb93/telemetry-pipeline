@@ -24,6 +24,7 @@ func main() {
 	persistence := flag.Bool("persistence", false, "Enable message persistence")
 	persistenceDir := flag.String("persistence-dir", "/tmp/mq-data", "Directory for message persistence")
 	brokerURL := flag.String("broker-url", "http://localhost:9090", "URL of MQ service (default: http://localhost:9090)")
+	topic := flag.String("topic", "telemetry", "Topic to publish messages to")
 	flag.Parse()
 
 	if *csvPath == "" {
@@ -44,7 +45,8 @@ func main() {
 		"rate", *rate,
 		"persistence", *persistence,
 		"persistence_dir", *persistenceDir,
-		"broker_url", *brokerURL)
+		"broker_url", *brokerURL,
+		"topic", *topic)
 
 	// Initialize the message broker with configuration
 	var broker mq.BrokerInterface
@@ -54,7 +56,7 @@ func main() {
 	broker = mq.NewHTTPBroker(*brokerURL)
 
 	// Create the streamer
-	s := streamer.NewStreamer(*csvPath, *workers, *rate, broker)
+	s := streamer.NewStreamer(*csvPath, *workers, *rate, *topic, broker)
 
 	// Start the streamer
 	if err := s.Start(); err != nil {

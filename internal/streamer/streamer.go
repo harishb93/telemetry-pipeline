@@ -25,6 +25,7 @@ type Streamer struct {
 	csvPath string
 	workers int
 	rate    float64
+	topic   string
 	broker  mq.BrokerInterface
 	ctx     context.Context
 	cancel  context.CancelFunc
@@ -33,12 +34,13 @@ type Streamer struct {
 }
 
 // NewStreamer creates a new streamer instance
-func NewStreamer(csvPath string, workers int, rate float64, broker mq.BrokerInterface) *Streamer {
+func NewStreamer(csvPath string, workers int, rate float64, topic string, broker mq.BrokerInterface) *Streamer {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Streamer{
 		csvPath: csvPath,
 		workers: workers,
 		rate:    rate,
+		topic:   topic,
 		broker:  broker,
 		ctx:     ctx,
 		cancel:  cancel,
@@ -193,7 +195,7 @@ func (s *Streamer) processCSVLoop(workerID int, headers []string, recordsProcess
 			}
 
 			// Publish to MQ
-			if err := s.broker.Publish("telemetry", msg); err != nil {
+			if err := s.broker.Publish(s.topic, msg); err != nil {
 				workerLogger.Error("Error publishing message", "error", err)
 			} else {
 				*recordsProcessed++
