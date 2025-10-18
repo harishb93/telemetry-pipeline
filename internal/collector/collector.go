@@ -37,6 +37,7 @@ type CollectorConfig struct {
 	CheckpointEnabled bool
 	CheckpointDir     string
 	HealthPort        string
+	MQTopic           string
 }
 
 // Collector handles telemetry data collection and persistence
@@ -121,7 +122,11 @@ func (c *Collector) worker(workerID int) {
 	c.logger.Info("Worker started", "worker_id", workerID)
 
 	// Subscribe to telemetry topic with acknowledgment support
-	ch, unsubscribe, err := c.broker.SubscribeWithAck("telemetry")
+	topic := c.config.MQTopic
+	if topic == "" {
+		topic = "telemetry" // default topic
+	}
+	ch, unsubscribe, err := c.broker.SubscribeWithAck(topic)
 	if err != nil {
 		c.logger.Error("Worker failed to subscribe", "worker_id", workerID, "error", err)
 		return

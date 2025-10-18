@@ -23,7 +23,7 @@ func main() {
 	rate := flag.Float64("rate", 1.0, "Messages per second per worker (fractional values allowed)")
 	persistence := flag.Bool("persistence", false, "Enable message persistence")
 	persistenceDir := flag.String("persistence-dir", "/tmp/mq-data", "Directory for message persistence")
-	brokerURL := flag.String("broker-url", "", "URL of remote MQ broker (if not set, uses local broker)")
+	brokerURL := flag.String("broker-url", "http://localhost:9090", "URL of MQ service (default: http://localhost:9090)")
 	flag.Parse()
 
 	if *csvPath == "" {
@@ -49,20 +49,9 @@ func main() {
 	// Initialize the message broker with configuration
 	var broker mq.BrokerInterface
 
-	if *brokerURL != "" {
-		// Use HTTP broker to connect to remote collector
-		log.Info("Connecting to remote broker", "url", *brokerURL)
-		broker = mq.NewHTTPBroker(*brokerURL)
-	} else {
-		// Use local broker (original behavior)
-		log.Info("Using local message broker")
-		config := mq.DefaultBrokerConfig()
-		config.PersistenceEnabled = *persistence
-		config.PersistenceDir = *persistenceDir
-		localBroker := mq.NewBroker(config)
-		defer localBroker.Close()
-		broker = localBroker
-	}
+	// Always use HTTP broker to connect to MQ service
+	log.Info("Connecting to MQ service", "url", *brokerURL)
+	broker = mq.NewHTTPBroker(*brokerURL)
 
 	// Create the streamer
 	s := streamer.NewStreamer(*csvPath, *workers, *rate, broker)

@@ -21,7 +21,7 @@ HELM_NAMESPACE ?= default
 	@echo "  HELM_NAMESPACE- Helm namespace (default: $(HELM_NAMESPACE))"
 
 # Build targets
-build: build-collector build-streamer build-api
+build: build-collector build-streamer build-api build-mq
 
 build-collector:
 	@echo "Building telemetry collector..."
@@ -34,6 +34,10 @@ build-streamer:
 build-api:
 	@echo "Building API gateway..."
 	go build -o bin/api-gateway ./cmd/api-gateway
+
+build-mq:
+	@echo "Building MQ service..."
+	go build -o bin/mq-service ./cmd/mq-service
 
 # Test targets
 test:
@@ -86,15 +90,19 @@ openapi-gen:
 # Run targets
 run-collector:
 	@echo "Starting telemetry collector..."
-	./bin/telemetry-collector --workers=4 --data-dir=./data --health-port=8080
+	./bin/telemetry-collector --workers=4 --data-dir=./data --health-port=8080 --mq-url=http://localhost:9090
 
 run-streamer:
 	@echo "Starting telemetry streamer..."
-	./bin/telemetry-streamer --csv=sample_data.csv --workers=2 --rate=5
+	./bin/telemetry-streamer --csv-file=data/sample_gpu_data.csv --workers=2 --rate=5 --broker-url=http://localhost:9090
 
 run-api:
 	@echo "Starting API gateway..."
 	./bin/api-gateway --port=8081 --data-dir=./data
+
+run-mq:
+	@echo "Starting MQ service..."
+	./bin/mq-service --port=9090 --persistence --persistence-dir=./mq-data
 
 # Development targets
 dev-setup: deps build

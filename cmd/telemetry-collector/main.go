@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/harishb93/telemetry-pipeline/internal/collector"
 	"github.com/harishb93/telemetry-pipeline/internal/logger"
@@ -18,15 +17,14 @@ func main() {
 
 	// Command line flags
 	var (
-		workers            = flag.Int("workers", 4, "Number of worker goroutines")
-		dataDir            = flag.String("data-dir", "./data", "Directory for file storage")
-		maxEntriesPerGPU   = flag.Int("max-entries", 1000, "Maximum entries per GPU in memory storage")
-		checkpointEnabled  = flag.Bool("checkpoint", true, "Enable checkpoint persistence")
-		checkpointDir      = flag.String("checkpoint-dir", "./checkpoints", "Directory for checkpoint files")
-		healthPort         = flag.String("health-port", "8080", "Port for health check server")
-		brokerPort         = flag.String("broker-port", "9090", "MQ broker admin port")
-		persistenceEnabled = flag.Bool("persistence", false, "Enable MQ persistence")
-		persistenceDir     = flag.String("persistence-dir", "./mq-data", "Directory for MQ persistence")
+		workers           = flag.Int("workers", 4, "Number of worker goroutines")
+		dataDir           = flag.String("data-dir", "./data", "Directory for file storage")
+		maxEntriesPerGPU  = flag.Int("max-entries", 1000, "Maximum entries per GPU in memory storage")
+		checkpointEnabled = flag.Bool("checkpoint", true, "Enable checkpoint persistence")
+		checkpointDir     = flag.String("checkpoint-dir", "./checkpoints", "Directory for checkpoint files")
+		healthPort        = flag.String("health-port", "8080", "Port for health check server")
+		mqServiceURL      = flag.String("mq-url", "http://localhost:9090", "URL of the MQ service")
+		mqTopic           = flag.String("mq-topic", "telemetry", "MQ topic to subscribe to")
 	)
 	flag.Parse()
 
@@ -38,27 +36,13 @@ func main() {
 		"checkpoint_enabled", *checkpointEnabled,
 		"checkpoint_dir", *checkpointDir,
 		"health_port", *healthPort,
-		"broker_port", *brokerPort,
-		"persistence_enabled", *persistenceEnabled,
-		"persistence_dir", *persistenceDir)
+		"mq_service_url", *mqServiceURL,
+		"mq_topic", *mqTopic)
 
-	// Create broker configuration
-	brokerConfig := mq.BrokerConfig{
-		PersistenceEnabled: *persistenceEnabled,
-		PersistenceDir:     *persistenceDir,
-		AckTimeout:         30 * time.Second,
-		MaxRetries:         3,
-	}
-
-	// Create and start MQ broker
+	// For now, create a local broker instance  
+	// TODO: Connect to external MQ service once subscription mechanism is implemented
+	brokerConfig := mq.DefaultBrokerConfig()
 	broker := mq.NewBroker(brokerConfig)
-
-	// Start broker admin server
-	go func() {
-		if err := broker.StartAdminServer(*brokerPort); err != nil {
-			log.Error("Failed to start broker admin server", "error", err)
-		}
-	}()
 
 	// Create collector configuration
 	collectorConfig := collector.CollectorConfig{
@@ -68,9 +52,10 @@ func main() {
 		CheckpointEnabled: *checkpointEnabled,
 		CheckpointDir:     *checkpointDir,
 		HealthPort:        *healthPort,
+		MQTopic:           *mqTopic,
 	}
 
-	// Create collector
+	// Create collector  
 	coll := collector.NewCollector(broker, collectorConfig)
 
 	// Set up signal handling for graceful shutdown
@@ -86,7 +71,7 @@ func main() {
 
 	log.Info("Collector started successfully",
 		"health_endpoint", "http://localhost:"+*healthPort+"/health",
-		"broker_admin_endpoint", "http://localhost:"+*brokerPort)
+		"mq_service_url", *mqServiceURL)
 	log.Info("Press Ctrl+C to stop...")
 
 	// Wait for shutdown signal
