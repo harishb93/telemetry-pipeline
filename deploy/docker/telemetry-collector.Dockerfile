@@ -37,9 +37,14 @@ EXPOSE 8080 9000 9091
 
 # Create non-root user
 RUN addgroup -g 1000 nonroot && adduser -u 1000 -G nonroot -s /sbin/nologin -D nonroot
+
+# Create data directories with proper permissions
+RUN mkdir -p /data /var/lib/mq && chown -R nonroot:nonroot /data /var/lib/mq
+
+# Switch to non-root user
 USER nonroot:nonroot
 
-# Create data directory
+# Set working directory
 WORKDIR /app
 
 # Default command

@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/harishb93/telemetry-pipeline/internal/logger"
 	"github.com/harishb93/telemetry-pipeline/internal/mq"
 	"github.com/harishb93/telemetry-pipeline/internal/persistence"
 )
@@ -48,6 +48,7 @@ type Collector struct {
 	checkpointMgr *persistence.CheckpointManager
 	ctx           context.Context
 	cancel        context.CancelFunc
+	logger        *logger.Logger
 	wg            sync.WaitGroup
 	healthServer  *http.Server
 }
@@ -72,12 +73,13 @@ func NewCollector(broker *mq.Broker, config CollectorConfig) *Collector {
 		checkpointMgr: checkpointMgr,
 		ctx:           ctx,
 		cancel:        cancel,
+		logger:        logger.NewFromEnv().WithComponent("collector"),
 	}
 }
 
 // Start begins collecting telemetry data with specified number of workers
 func (c *Collector) Start() error {
-	log.Printf("Collector starting with %d workers", c.config.Workers)
+	c.logger.Info("Collector starting", "workers", c.config.Workers)
 
 	// Start health server
 	if err := c.startHealthServer(); err != nil {
@@ -95,7 +97,7 @@ func (c *Collector) Start() error {
 
 // Stop gracefully stops the collector
 func (c *Collector) Stop() {
-	log.Println("Collector stopping...")
+	c.logger.Info("Collector stopping")
 
 	// Stop health server
 	if c.healthServer != nil {
@@ -108,18 +110,18 @@ func (c *Collector) Stop() {
 	c.cancel()
 	c.wg.Wait()
 
-	log.Println("Collector stopped")
+	c.logger.Info("Collector stopped")
 }
 
 // worker runs a single worker goroutine
 func (c *Collector) worker(workerID int) {
 	defer c.wg.Done()
-	log.Printf("Worker %d started", workerID)
+	c.logger.Info("Worker started", "worker_id", workerID)
 
 	// Subscribe to telemetry topic with acknowledgment support
 	ch, unsubscribe, err := c.broker.SubscribeWithAck("telemetry")
 	if err != nil {
-		log.Printf("Worker %d: Failed to subscribe: %v", workerID, err)
+		c.logger.Error("Worker failed to subscribe", "worker_id", workerID, "error", err)
 		return
 	}
 	defer unsubscribe()
@@ -130,7 +132,7 @@ func (c *Collector) worker(workerID int) {
 		checkpointName := fmt.Sprintf("worker-%d", workerID)
 		if checkpoint, err := c.checkpointMgr.LoadCheckpoint(checkpointName); err == nil {
 			lastOffset = checkpoint.ProcessedCount
-			log.Printf("Worker %d: Loaded checkpoint offset %d", workerID, lastOffset)
+			c.logger.Debug("Worker loaded checkpoint", "worker_id", workerID, "offset", lastOffset)
 		}
 	}
 
@@ -139,11 +141,11 @@ func (c *Collector) worker(workerID int) {
 	for {
 		select {
 		case <-c.ctx.Done():
-			log.Printf("Worker %d stopping after processing %d messages", workerID, processedCount)
+			c.logger.Info("Worker stopping", "worker_id", workerID, "messages_processed", processedCount)
 			return
 		case msg := <-ch:
 			if err := c.handleMessage(workerID, msg); err != nil {
-				log.Printf("Worker %d: Error handling message: %v", workerID, err)
+				c.logger.Error("Worker error handling message", "worker_id", workerID, "error", err)
 				// Don't acknowledge failed messages for potential retry
 				continue
 			}
@@ -156,12 +158,12 @@ func (c *Collector) worker(workerID int) {
 			if c.checkpointMgr != nil && processedCount%100 == 0 {
 				checkpointName := fmt.Sprintf("worker-%d", workerID)
 				if err := c.checkpointMgr.UpdateProcessedCount(checkpointName, 100); err != nil {
-					log.Printf("Worker %d: Failed to update checkpoint: %v", workerID, err)
+					c.logger.Error("Worker failed to update checkpoint", "worker_id", workerID, "error", err)
 				}
 			}
 
 			if processedCount%1000 == 0 {
-				log.Printf("Worker %d: Processed %d messages", workerID, processedCount)
+				c.logger.Debug("Worker batch processed", "worker_id", workerID, "messages_processed", processedCount)
 			}
 		}
 	}
@@ -191,7 +193,7 @@ func (c *Collector) handleMessage(workerID int, msg mq.Message) error {
 
 	// Persist to file storage
 	if err := c.fileStorage.WriteTelemetry(persistenceTelemetry); err != nil {
-		log.Printf("Worker %d: Failed to write to file storage: %v", workerID, err)
+		c.logger.Error("Worker failed to write to file storage", "worker_id", workerID, "error", err)
 		// Continue processing even if file write fails
 	}
 
@@ -415,9 +417,9 @@ func (c *Collector) startHealthServer() error {
 	}
 
 	go func() {
-		log.Printf("Health server starting on port %s", c.config.HealthPort)
+		c.logger.Info("Health server starting", "port", c.config.HealthPort)
 		if err := c.healthServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("Health server error: %v", err)
+			c.logger.Error("Health server error", "error", err)
 		}
 	}()
 

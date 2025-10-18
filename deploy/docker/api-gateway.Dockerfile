@@ -37,9 +37,14 @@ EXPOSE 8081 9092
 
 # Create non-root user
 RUN addgroup -g 1000 nonroot && adduser -u 1000 -G nonroot -s /sbin/nologin -D nonroot
+
+# Create data directory with proper permissions (read-only for API gateway)
+RUN mkdir -p /data && chown -R nonroot:nonroot /data
+
+# Switch to non-root user
 USER nonroot:nonroot
 
-# Create data directory
+# Set working directory
 WORKDIR /app
 
 # Default command

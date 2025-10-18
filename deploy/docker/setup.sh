@@ -69,26 +69,49 @@ build_images() {
 start_services() {
     log_info "Starting telemetry pipeline services..."
     
+    # Create necessary directories with proper permissions
+    log_info "Creating data directories..."
+    mkdir -p data mq-data sample-data
+    
+    # Ensure proper ownership for Docker volumes (UID:GID 1000:1000)
+    if [ "$(id -u)" = "0" ]; then
+        # Running as root, set ownership
+        chown -R 1000:1000 data mq-data sample-data
+    elif [ "$(id -u)" != "1000" ]; then
+        # Not running as the expected user, warn but continue
+        log_warning "Not running as UID 1000 - you may encounter permission issues"
+        log_warning "Consider running: sudo chown -R 1000:1000 data mq-data sample-data"
+    fi
+    
     # Check if sample data exists
     if [ ! -f "./sample-data/telemetry.csv" ]; then
         log_warning "Sample data not found, creating default telemetry.csv"
-        mkdir -p sample-data
         cat > sample-data/telemetry.csv << 'EOF'
-gpu_id,utilization,temperature,memory_used
-gpu-001,85.5,72.3,4096
-gpu-002,90.2,75.1,8192
-gpu-003,45.0,65.0,2048
+# DCGM format CSV with hostname field
+# Fields: timestamp,gpu_id,utilization,temperature,memory_used,power_draw,fan_speed,hostname
+2024-01-01T12:00:00Z,GPU-f2b8d424-ed80-cddd-67d0-00bf52c03704,85.5,72.3,4096,250.5,2500,mtv5-dgx1-hgpu-031
+2024-01-01T12:00:01Z,GPU-a1c4d567-12ab-3456-78ef-90123456789a,90.2,75.1,8192,275.2,2600,mtv5-dgx1-hgpu-022
+2024-01-01T12:00:02Z,GPU-b2d5e678-23bc-4567-89fg-01234567890b,45.0,65.0,2048,180.1,2200,mtv5-dgx1-hgpu-010
+2024-01-01T12:00:03Z,GPU-c3e6f789-34cd-5678-90gh-12345678901c,78.3,69.5,6144,225.8,2400,mtv5-dgx1-hgpu-031
+2024-01-01T12:00:04Z,GPU-d4f7g890-45de-6789-01hi-23456789012d,92.1,77.8,7168,285.4,2700,mtv5-dgx1-hgpu-012
 EOF
+        # Set proper permissions on the created file
+        chmod 644 sample-data/telemetry.csv
+        if [ "$(id -u)" = "0" ]; then
+            chown 1000:1000 sample-data/telemetry.csv
+        fi
+        log_success "Created sample telemetry data with DCGM format"
     fi
     
     # Start services
+    log_info "Starting containers..."
     docker compose up -d
     
     log_success "Services started successfully!"
     
     # Wait for services to be ready
     log_info "Waiting for services to be ready..."
-    sleep 10
+    sleep 15
     
     # Check service health
     check_services
@@ -145,6 +168,8 @@ show_endpoints() {
     log_info "API endpoints:"
     echo "  📝 List GPUs:         curl http://localhost:8081/api/v1/gpus"
     echo "  📊 GPU Telemetry:     curl http://localhost:8081/api/v1/gpus/gpu-001/telemetry"
+    echo "  📝 List Hosts:        curl http://localhost:8081/api/v1/hosts"
+    echo "  📊 GPU On Hosts:      curl http://localhost:8081/api/v1/hosts/host-A/gpus"
     echo ""
     log_info "Management commands:"
     echo "  📋 View logs:         docker compose logs -f"

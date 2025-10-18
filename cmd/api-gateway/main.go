@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,6 +9,7 @@ import (
 	_ "github.com/harishb93/telemetry-pipeline/api" // Swagger docs
 	"github.com/harishb93/telemetry-pipeline/internal/api"
 	"github.com/harishb93/telemetry-pipeline/internal/collector"
+	"github.com/harishb93/telemetry-pipeline/internal/logger"
 	"github.com/harishb93/telemetry-pipeline/internal/mq"
 )
 
@@ -25,6 +25,9 @@ import (
 // @BasePath /api/v1
 
 func main() {
+	// Initialize logger
+	log := logger.NewFromEnv().WithComponent("api-gateway")
+
 	// Command line flags
 	var (
 		port          = flag.String("port", "8081", "Port for API server")
@@ -33,9 +36,11 @@ func main() {
 	)
 	flag.Parse()
 
-	log.Printf("Starting Telemetry API Gateway")
-	log.Printf("API Port: %s", *port)
-	log.Printf("Data Directory: %s", *dataDir)
+	log.Info("Starting Telemetry API Gateway")
+	log.Info("Configuration loaded",
+		"api_port", *port,
+		"collector_port", *collectorPort,
+		"data_dir", *dataDir)
 
 	// Create a minimal collector instance for data access
 	// In a real deployment, this would connect to the actual collector service
@@ -66,23 +71,25 @@ func main() {
 	// Start server in background
 	go func() {
 		if err := server.Start(); err != nil {
-			log.Fatalf("Failed to start API server: %v", err)
+			log.Fatal("Failed to start API server", "error", err)
 		}
 	}()
 
-	log.Printf("API Gateway started successfully on port %s", *port)
-	log.Printf("Swagger UI available at http://localhost:%s/swagger/", *port)
-	log.Printf("Health endpoint: http://localhost:%s/health", *port)
-	log.Printf("Press Ctrl+C to stop...")
+	log.Info("API Gateway started successfully",
+		"port", *port,
+		"swagger_ui", "http://localhost:"+*port+"/swagger/",
+		"health_endpoint", "http://localhost:"+*port+"/health",
+		"api_base", "http://localhost:"+*port+"/api/v1")
+	log.Info("Press Ctrl+C to stop...")
 
 	// Wait for shutdown signal
 	<-sigCh
-	log.Printf("Shutdown signal received, stopping API Gateway...")
+	log.Info("Shutdown signal received, stopping API Gateway...")
 
 	// Graceful shutdown
 	if err := server.Stop(); err != nil {
-		log.Printf("Error stopping server: %v", err)
+		log.Error("Error stopping server", "error", err)
 	}
 
-	log.Printf("API Gateway stopped successfully")
+	log.Info("API Gateway stopped successfully")
 }

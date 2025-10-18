@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/harishb93/telemetry-pipeline/internal/logger"
 	"github.com/harishb93/telemetry-pipeline/internal/mq"
 )
 
@@ -29,6 +29,7 @@ type Streamer struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
 	wg      sync.WaitGroup
+	logger  *logger.Logger
 }
 
 // NewStreamer creates a new streamer instance
@@ -41,20 +42,31 @@ func NewStreamer(csvPath string, workers int, rate float64, broker mq.BrokerInte
 		broker:  broker,
 		ctx:     ctx,
 		cancel:  cancel,
+		logger:  logger.NewFromEnv().WithComponent("streamer"),
 	}
 }
 
 // Start begins streaming CSV data to MQ with specified number of workers
 func (s *Streamer) Start() error {
-	log.Printf("Streamer starting with %d workers at rate %.2f msg/sec per worker", s.workers, s.rate)
+	s.logger.Info("Streamer starting",
+		"workers", s.workers,
+		"rate_per_worker", s.rate,
+		"csv_file", s.csvPath)
+
+	// Check if CSV file is accessible
+	if _, err := os.Stat(s.csvPath); err != nil {
+		s.logger.Error("CSV file not accessible", "file", s.csvPath, "error", err)
+		return fmt.Errorf("failed to access CSV file: %w", err)
+	}
 
 	// Read CSV headers first
 	headers, err := s.readHeaders()
 	if err != nil {
+		s.logger.Error("Failed to read CSV headers", "error", err)
 		return fmt.Errorf("failed to read CSV headers: %w", err)
 	}
 
-	log.Printf("CSV headers: %v", headers)
+	s.logger.Info("CSV headers parsed", "headers", headers, "count", len(headers))
 
 	// Start workers
 	for i := 0; i < s.workers; i++ {
@@ -62,15 +74,16 @@ func (s *Streamer) Start() error {
 		go s.worker(i, headers)
 	}
 
+	s.logger.Info("All workers started successfully")
 	return nil
 }
 
 // Stop gracefully stops the streamer
 func (s *Streamer) Stop() {
-	log.Println("Streamer stopping...")
+	s.logger.Info("Streamer stopping...")
 	s.cancel()
 	s.wg.Wait()
-	log.Println("All workers stopped")
+	s.logger.Info("All workers stopped")
 }
 
 // readHeaders reads the CSV file headers
@@ -93,12 +106,14 @@ func (s *Streamer) readHeaders() ([]string, error) {
 // worker runs a single worker goroutine
 func (s *Streamer) worker(workerID int, headers []string) {
 	defer s.wg.Done()
-	log.Printf("Worker %d started", workerID)
+	workerLogger := s.logger.WithComponent("worker").With("worker_id", workerID)
+	workerLogger.Info("Worker started")
 
 	// Calculate rate interval
 	var rateInterval time.Duration
 	if s.rate > 0 {
 		rateInterval = time.Duration(float64(time.Second) / s.rate)
+		workerLogger.Debug("Rate limiting configured", "interval", rateInterval)
 	}
 
 	recordsProcessed := 0
@@ -106,12 +121,12 @@ func (s *Streamer) worker(workerID int, headers []string) {
 	for {
 		select {
 		case <-s.ctx.Done():
-			log.Printf("Worker %d stopping after processing %d records", workerID, recordsProcessed)
+			workerLogger.Info("Worker stopping", "records_processed", recordsProcessed)
 			return
 		default:
 			// Open CSV file for this worker's loop iteration
-			if err := s.processCSVLoop(workerID, headers, &recordsProcessed, rateInterval); err != nil {
-				log.Printf("Worker %d: Error processing CSV: %v", workerID, err)
+			if err := s.processCSVLoop(workerID, headers, &recordsProcessed, rateInterval, workerLogger); err != nil {
+				workerLogger.Error("Error processing CSV", "error", err)
 				// Continue to next iteration after a brief pause
 				time.Sleep(1 * time.Second)
 			}
@@ -120,7 +135,7 @@ func (s *Streamer) worker(workerID int, headers []string) {
 }
 
 // processCSVLoop processes the entire CSV file once
-func (s *Streamer) processCSVLoop(workerID int, headers []string, recordsProcessed *int, rateInterval time.Duration) error {
+func (s *Streamer) processCSVLoop(workerID int, headers []string, recordsProcessed *int, rateInterval time.Duration, workerLogger *logger.Logger) error {
 	file, err := os.Open(s.csvPath)
 	if err != nil {
 		return err
@@ -142,7 +157,7 @@ func (s *Streamer) processCSVLoop(workerID int, headers []string, recordsProcess
 			record, err := reader.Read()
 			if err != nil {
 				if err == io.EOF {
-					log.Printf("Worker %d: Reached end of CSV, restarting from beginning", workerID)
+					workerLogger.Debug("Reached end of CSV, restarting from beginning")
 					return nil // Return to restart the loop
 				}
 				return err
@@ -151,14 +166,14 @@ func (s *Streamer) processCSVLoop(workerID int, headers []string, recordsProcess
 			// Parse record into flexible format
 			telemetryData, err := s.parseRecord(headers, record)
 			if err != nil {
-				log.Printf("Worker %d: Error parsing record: %v", workerID, err)
+				workerLogger.Warn("Error parsing record", "error", err, "record", record)
 				continue
 			}
 
 			// Convert to JSON
 			jsonData, err := json.Marshal(telemetryData)
 			if err != nil {
-				log.Printf("Worker %d: Error marshaling to JSON: %v", workerID, err)
+				workerLogger.Error("Error marshaling to JSON", "error", err)
 				continue
 			}
 
@@ -170,11 +185,11 @@ func (s *Streamer) processCSVLoop(workerID int, headers []string, recordsProcess
 
 			// Publish to MQ
 			if err := s.broker.Publish("telemetry", msg); err != nil {
-				log.Printf("Worker %d: Error publishing message: %v", workerID, err)
+				workerLogger.Error("Error publishing message", "error", err)
 			} else {
 				*recordsProcessed++
 				if *recordsProcessed%100 == 0 {
-					log.Printf("Worker %d: Processed %d records", workerID, *recordsProcessed)
+					workerLogger.Info("Processed records", "count", *recordsProcessed)
 				}
 			}
 

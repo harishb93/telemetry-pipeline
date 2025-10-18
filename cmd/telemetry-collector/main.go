@@ -2,17 +2,20 @@ package main
 
 import (
 	"flag"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/harishb93/telemetry-pipeline/internal/collector"
+	"github.com/harishb93/telemetry-pipeline/internal/logger"
 	"github.com/harishb93/telemetry-pipeline/internal/mq"
 )
 
 func main() {
+	// Initialize logger
+	log := logger.NewFromEnv().WithComponent("collector")
+
 	// Command line flags
 	var (
 		workers            = flag.Int("workers", 4, "Number of worker goroutines")
@@ -27,12 +30,17 @@ func main() {
 	)
 	flag.Parse()
 
-	log.Printf("Starting Telemetry Collector")
-	log.Printf("Workers: %d", *workers)
-	log.Printf("Data Directory: %s", *dataDir)
-	log.Printf("Max Entries per GPU: %d", *maxEntriesPerGPU)
-	log.Printf("Checkpoint Enabled: %t", *checkpointEnabled)
-	log.Printf("Health Port: %s", *healthPort)
+	log.Info("Starting Telemetry Collector")
+	log.Info("Configuration loaded",
+		"workers", *workers,
+		"data_dir", *dataDir,
+		"max_entries_per_gpu", *maxEntriesPerGPU,
+		"checkpoint_enabled", *checkpointEnabled,
+		"checkpoint_dir", *checkpointDir,
+		"health_port", *healthPort,
+		"broker_port", *brokerPort,
+		"persistence_enabled", *persistenceEnabled,
+		"persistence_dir", *persistenceDir)
 
 	// Create broker configuration
 	brokerConfig := mq.BrokerConfig{
@@ -48,7 +56,7 @@ func main() {
 	// Start broker admin server
 	go func() {
 		if err := broker.StartAdminServer(*brokerPort); err != nil {
-			log.Printf("Failed to start broker admin server: %v", err)
+			log.Error("Failed to start broker admin server", "error", err)
 		}
 	}()
 
@@ -72,19 +80,21 @@ func main() {
 	// Start collector in background
 	go func() {
 		if err := coll.Start(); err != nil {
-			log.Fatalf("Failed to start collector: %v", err)
+			log.Fatal("Failed to start collector", "error", err)
 		}
 	}()
 
-	log.Printf("Collector started successfully. Health endpoint: http://localhost:%s/health", *healthPort)
-	log.Printf("Press Ctrl+C to stop...")
+	log.Info("Collector started successfully",
+		"health_endpoint", "http://localhost:"+*healthPort+"/health",
+		"broker_admin_endpoint", "http://localhost:"+*brokerPort)
+	log.Info("Press Ctrl+C to stop...")
 
 	// Wait for shutdown signal
 	<-sigCh
-	log.Printf("Shutdown signal received, stopping collector...")
+	log.Info("Shutdown signal received, stopping collector...")
 
 	// Graceful shutdown
 	coll.Stop()
 
-	log.Printf("Collector stopped successfully")
+	log.Info("Collector stopped successfully")
 }

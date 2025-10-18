@@ -2,17 +2,20 @@ package main
 
 import (
 	"flag"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/harishb93/telemetry-pipeline/internal/logger"
 	"github.com/harishb93/telemetry-pipeline/internal/mq"
 	"github.com/harishb93/telemetry-pipeline/internal/streamer"
 )
 
 func main() {
-	log.Println("Telemetry Streamer starting...")
+	// Initialize logger
+	log := logger.NewFromEnv().WithComponent("streamer")
+
+	log.Info("Telemetry Streamer starting...")
 
 	// Define CLI flags
 	csvPath := flag.String("csv-file", "", "Path to the CSV file containing telemetry data")
@@ -24,7 +27,7 @@ func main() {
 	flag.Parse()
 
 	if *csvPath == "" {
-		log.Fatal("--csv flag is required")
+		log.Fatal("--csv-file flag is required")
 	}
 
 	// Validate inputs
@@ -35,16 +38,24 @@ func main() {
 		log.Fatal("--rate must be greater than 0")
 	}
 
+	log.Info("Configuration loaded",
+		"csv_file", *csvPath,
+		"workers", *workers,
+		"rate", *rate,
+		"persistence", *persistence,
+		"persistence_dir", *persistenceDir,
+		"broker_url", *brokerURL)
+
 	// Initialize the message broker with configuration
 	var broker mq.BrokerInterface
 
 	if *brokerURL != "" {
 		// Use HTTP broker to connect to remote collector
-		log.Printf("Connecting to remote broker at: %s", *brokerURL)
+		log.Info("Connecting to remote broker", "url", *brokerURL)
 		broker = mq.NewHTTPBroker(*brokerURL)
 	} else {
 		// Use local broker (original behavior)
-		log.Println("Using local message broker")
+		log.Info("Using local message broker")
 		config := mq.DefaultBrokerConfig()
 		config.PersistenceEnabled = *persistence
 		config.PersistenceDir = *persistenceDir
@@ -58,19 +69,22 @@ func main() {
 
 	// Start the streamer
 	if err := s.Start(); err != nil {
-		log.Fatalf("Failed to start streamer: %v", err)
+		log.Fatal("Failed to start streamer", "error", err)
 	}
 
 	// Handle graceful shutdown
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)
 
-	log.Printf("Streamer running with %d workers at %.2f msg/sec per worker", *workers, *rate)
-	log.Println("Press Ctrl+C to stop...")
+	log.Info("Streamer running",
+		"workers", *workers,
+		"rate_per_worker", *rate,
+		"total_rate", float64(*workers)*(*rate))
+	log.Info("Press Ctrl+C to stop...")
 
 	<-signalCh
-	log.Println("Received shutdown signal, stopping streamer...")
+	log.Info("Received shutdown signal, stopping streamer...")
 
 	s.Stop()
-	log.Println("Streamer stopped gracefully")
+	log.Info("Streamer stopped gracefully")
 }
