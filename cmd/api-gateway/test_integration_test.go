@@ -13,11 +13,15 @@ import (
 
 func TestGRPCIntegration(t *testing.T) {
 	// Connect to the gRPC server
-	conn, err := grpc.Dial("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		t.Fatalf("Failed to connect to collector service: %v", err)
+		t.Fatalf("Failed to connect to gRPC server: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Logf("Failed to close connection: %v", err)
+		}
+	}()
 
 	client := proto.NewCollectorServiceClient(conn)
 

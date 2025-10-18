@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.22'
+    
+    - name: Install dependencies
+      run: make deps
+    
+    - name: Run tests
+      run: make test
+    
+    - name: Run linting
+      run: make lint
+    
+    - name: Build all components
+      run: make build
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    
+    - name: Extract version from tag
+      id: version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+    
+    - name: Build and push Docker images
+      run: |
+        export TAG=${{ steps.version.outputs.VERSION }}
+        export REGISTRY=${{ secrets.DOCKER_USERNAME }}
+        make docker-build
+        make docker-push
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.version.outputs.VERSION }}
+        name: Release ${{ steps.version.outputs.VERSION }}
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        files: |
+          bin/telemetry-streamer
+          bin/telemetry-collector
+          bin/api-gateway
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -103,7 +103,9 @@ func (c *Collector) Stop() {
 	if c.healthServer != nil {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		c.healthServer.Shutdown(shutdownCtx)
+		if err := c.healthServer.Shutdown(shutdownCtx); err != nil {
+			c.logger.Error("Failed to shutdown health server", "error", err)
+		}
 	}
 
 	// Stop workers
@@ -305,7 +307,9 @@ func (c *Collector) startHealthServer() error {
 		// Simple health check - could be enhanced with more detailed status
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"healthy","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`))
+		if _, err := w.Write([]byte(`{"status":"healthy","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`)); err != nil {
+			c.logger.Error("Failed to write health response", "error", err)
+		}
 	})
 
 	// Stats endpoint
@@ -317,7 +321,10 @@ func (c *Collector) startHealthServer() error {
 
 		stats := c.memoryStorage.GetStats()
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(stats)
+		if err := json.NewEncoder(w).Encode(stats); err != nil {
+			c.logger.Error("Failed to encode stats response", "error", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
 	})
 
 	// Telemetry endpoint for specific GPU
@@ -351,11 +358,14 @@ func (c *Collector) startHealthServer() error {
 		telemetryData := c.GetTelemetryForGPU(gpuID, 100) // Get last 100 entries
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"data":   telemetryData,
 			"total":  len(telemetryData),
 			"gpu_id": gpuID,
-		})
+		}); err != nil {
+			c.logger.Error("Failed to encode telemetry response", "error", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
 	})
 
 	// Hosts endpoint
@@ -367,10 +377,13 @@ func (c *Collector) startHealthServer() error {
 
 		hosts := c.GetAllHosts()
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"hosts": hosts,
 			"total": len(hosts),
-		})
+		}); err != nil {
+			c.logger.Error("Failed to encode hosts response", "error", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
 	})
 
 	// Host GPUs endpoint
@@ -404,11 +417,14 @@ func (c *Collector) startHealthServer() error {
 		gpus := c.GetGPUsForHost(hostname)
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"hostname": hostname,
 			"gpus":     gpus,
 			"total":    len(gpus),
-		})
+		}); err != nil {
+			c.logger.Error("Failed to encode host GPUs response", "error", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
 	})
 
 	c.healthServer = &http.Server{

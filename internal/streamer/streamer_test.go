@@ -19,26 +19,42 @@ func createTestCSV(t *testing.T, headers []string, records [][]string) string {
 	if err != nil {
 		t.Fatalf("Failed to create test CSV: %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			t.Logf("Failed to close file: %v", err)
+		}
+	}()
 
 	// Write headers
 	for i, header := range headers {
 		if i > 0 {
-			file.WriteString(",")
+			if _, err := file.WriteString(","); err != nil {
+				t.Fatalf("Failed to write comma: %v", err)
+			}
 		}
-		file.WriteString(header)
+		if _, err := file.WriteString(header); err != nil {
+			t.Fatalf("Failed to write header: %v", err)
+		}
 	}
-	file.WriteString("\n")
+	if _, err := file.WriteString("\n"); err != nil {
+		t.Fatalf("Failed to write newline: %v", err)
+	}
 
 	// Write records
 	for _, record := range records {
 		for i, field := range record {
 			if i > 0 {
-				file.WriteString(",")
+				if _, err := file.WriteString(","); err != nil {
+					t.Fatalf("Failed to write comma: %v", err)
+				}
 			}
-			file.WriteString(field)
+			if _, err := file.WriteString(field); err != nil {
+				t.Fatalf("Failed to write field: %v", err)
+			}
 		}
-		file.WriteString("\n")
+		if _, err := file.WriteString("\n"); err != nil {
+			t.Fatalf("Failed to write newline: %v", err)
+		}
 	}
 
 	return csvPath
@@ -302,9 +318,10 @@ func TestStreamerRateControl(t *testing.T) {
 		select {
 		case <-ch:
 			messagesReceived++
-			if messagesReceived == 1 {
+			switch messagesReceived {
+			case 1:
 				firstMessageTime = time.Now()
-			} else if messagesReceived == 2 {
+			case 2:
 				secondMessageTime = time.Now()
 				goto done
 			}
@@ -402,25 +419,41 @@ func BenchmarkStreamerThroughput(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create benchmark CSV: %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			b.Logf("Failed to close file: %v", err)
+		}
+	}()
 
 	// Write CSV data
 	for i, header := range headers {
 		if i > 0 {
-			file.WriteString(",")
+			if _, err := file.WriteString(","); err != nil {
+				b.Fatalf("Failed to write comma: %v", err)
+			}
 		}
-		file.WriteString(header)
+		if _, err := file.WriteString(header); err != nil {
+			b.Fatalf("Failed to write header: %v", err)
+		}
 	}
-	file.WriteString("\n")
+	if _, err := file.WriteString("\n"); err != nil {
+		b.Fatalf("Failed to write newline: %v", err)
+	}
 
 	for _, record := range records {
 		for i, field := range record {
 			if i > 0 {
-				file.WriteString(",")
+				if _, err := file.WriteString(","); err != nil {
+					b.Fatalf("Failed to write comma: %v", err)
+				}
 			}
-			file.WriteString(field)
+			if _, err := file.WriteString(field); err != nil {
+				b.Fatalf("Failed to write field: %v", err)
+			}
 		}
-		file.WriteString("\n")
+		if _, err := file.WriteString("\n"); err != nil {
+			b.Fatalf("Failed to write newline: %v", err)
+		}
 	}
 
 	// Create broker
@@ -432,7 +465,9 @@ func BenchmarkStreamerThroughput(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		streamer := NewStreamer(csvPath, 1, 100.0, broker) // High rate for benchmark
-		streamer.Start()
+		if err := streamer.Start(); err != nil {
+			b.Fatalf("Failed to start streamer: %v", err)
+		}
 		time.Sleep(100 * time.Millisecond) // Let it process briefly
 		streamer.Stop()
 	}

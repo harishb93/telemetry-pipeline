@@ -8,21 +8,7 @@ HELM_NAMESPACE ?= default
 
 .PHONY: help build test coverage clean clean-docker openapi-gen docker-build docker-push docker-deploy helm-install helm-uninstall helm-status run-collector run-streamer run-api lint deps all deploy dev ci registry-start registry-stop registry-status system-tests system-tests-quick system-tests-performance
 
-# Default target
-help:
-	@echo "Available targets:"
-	@echo "  build         - Build all binaries"
-	@echo "  test          - Run unit and integration tests with coverage"
-	@echo "  system-tests  - Run comprehensive system tests (end-to-end)"
-	@echo "  system-tests-quick - Run quick system tests (functional only)"
-	@echo "  system-tests-performance - Run performance system tests"
-	@echo "  coverage      - Generate coverage report"
-	@echo "  docker-build  - Build Docker images (TAG=$(TAG))"
-	@echo "  docker-push   - Push Docker images to registry ($(REGISTRY))"
-	@echo "  helm-install  - Install to local cluster with Helm"
-	@echo "  openapi-gen   - Generate OpenAPI specification"
-	@echo "  clean         - Clean build artifacts"
-	@echo "  run-collector - Run telemetry collector"
+# Default target (this will be replaced by the comprehensive help target later)
 	@echo "  run-streamer  - Run telemetry streamer"
 	@echo "  run-api       - Run API gateway"
 	@echo "  lint          - Run linter"
@@ -124,9 +110,10 @@ lint:
 	@if command -v golangci-lint >/dev/null 2>&1; then \
 		golangci-lint run; \
 	else \
-		echo "golangci-lint not found, running basic checks..."; \
-		go vet ./...; \
-		go fmt ./...; \
+		echo "golangci-lint not found, installing..."; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh; \
+		export PATH=$$PATH:$(pwd)/bin; \
+		golangci-lint run; \
 	fi
 
 clean:
@@ -159,12 +146,7 @@ docker-build:
 	docker tag api-gateway:$(TAG) $(REGISTRY)/api-gateway:$(TAG)
 	@echo "Docker images built successfully!"
 
-docker-push: docker-build
-	@echo "Pushing Docker images to registry: $(REGISTRY)"
-	docker push $(REGISTRY)/telemetry-streamer:$(TAG)
-	docker push $(REGISTRY)/telemetry-collector:$(TAG)
-	docker push $(REGISTRY)/api-gateway:$(TAG)
-	@echo "Docker images pushed successfully!"
+# Docker push target moved to end of file
 
 # Helm targets
 helm-install:
@@ -276,3 +258,48 @@ sample-data:
 	@echo "gpu_2,67.2,48.3,2100,185.0,1850" >> data/sample_gpu_data.csv
 	@echo "gpu_3,79.5,96.8,12400,298.5,3050" >> data/sample_gpu_data.csv
 	@echo "Sample data created in data/sample_gpu_data.csv"
+
+# Generate API documentation
+docs:
+	@echo "Generating API documentation..."
+	@which swag > /dev/null || (echo "Installing swag..." && go install github.com/swaggo/swag/cmd/swag@latest)
+	swag init -g cmd/api-gateway/main.go -o api/
+	@echo "API documentation generated in api/ directory"
+
+# Docker push target for releasing images
+docker-push:
+	@echo "Pushing Docker images to registry: $(REGISTRY)"
+	docker push $(REGISTRY)/telemetry-streamer:$(TAG)
+	docker push $(REGISTRY)/telemetry-collector:$(TAG)
+	docker push $(REGISTRY)/api-gateway:$(TAG)
+	@echo "Docker images pushed successfully!"
+
+# Integration tests
+test-integration:
+	@echo "Running integration tests..."
+	go test -v ./cmd/api-gateway/... -tags=integration
+	@echo "Integration tests completed!"
+
+# Show help
+help:
+	@echo "Available targets:"
+	@echo "  build             - Build all components"
+	@echo "  test              - Run unit tests"
+	@echo "  test-integration  - Run integration tests"
+	@echo "  coverage          - Generate test coverage report"
+	@echo "  lint              - Run linter"
+	@echo "  clean             - Clean build artifacts"
+	@echo "  clean-docker      - Clean Docker images"
+	@echo "  docker-build      - Build Docker images"
+	@echo "  docker-push       - Push Docker images to registry"
+	@echo "  docs              - Generate API documentation"
+	@echo "  deps              - Install dependencies"
+	@echo "  deploy            - Deploy using Docker Compose"
+	@echo "  undeploy          - Stop Docker Compose services"
+	@echo "  registry-up       - Start local Docker registry"
+	@echo "  registry-down     - Stop local Docker registry"
+	@echo "  registry-status   - Check registry status"
+	@echo "  sample-data       - Create sample test data"
+	@echo "  help              - Show this help message"
+
+.PHONY: build test test-integration coverage lint clean clean-docker docker-build docker-push docs deps deploy undeploy registry-up registry-down registry-status sample-data help

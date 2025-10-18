@@ -92,7 +92,12 @@ func (s *Streamer) readHeaders() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			// Can't return error from defer in this context
+			fmt.Printf("Warning: failed to close file: %v\n", err)
+		}
+	}()
 
 	reader := csv.NewReader(file)
 	headers, err := reader.Read()
@@ -140,7 +145,11 @@ func (s *Streamer) processCSVLoop(workerID int, headers []string, recordsProcess
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("Warning: failed to close file: %v\n", err)
+		}
+	}()
 
 	reader := csv.NewReader(file)
 

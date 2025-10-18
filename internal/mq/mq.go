@@ -64,7 +64,10 @@ func NewBroker(config BrokerConfig) *Broker {
 
 	// Create persistence directory if needed
 	if config.PersistenceEnabled {
-		os.MkdirAll(config.PersistenceDir, 0755)
+		if err := os.MkdirAll(config.PersistenceDir, 0755); err != nil {
+			// Log error but don't fail broker creation
+			fmt.Printf("Warning: failed to create persistence directory: %v\n", err)
+		}
 	}
 
 	// Start background goroutine for handling acknowledgment timeouts
@@ -402,7 +405,10 @@ func (b *Broker) StartAdminServer(port string) error {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "healthy"})
+		if err := json.NewEncoder(w).Encode(map[string]string{"status": "healthy"}); err != nil {
+			fmt.Printf("Warning: failed to encode health response: %v\n", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
 	})
 
 	// Publish endpoint for HTTP clients
@@ -435,7 +441,10 @@ func (b *Broker) StartAdminServer(port string) error {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "published"})
+		if err := json.NewEncoder(w).Encode(map[string]string{"status": "published"}); err != nil {
+			fmt.Printf("Warning: failed to encode publish response: %v\n", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
 	})
 
 	// Topic-specific stats endpoint
@@ -467,7 +476,10 @@ func (b *Broker) StartAdminServer(port string) error {
 		b.mu.RUnlock()
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(stats)
+		if err := json.NewEncoder(w).Encode(stats); err != nil {
+			fmt.Printf("Warning: failed to encode stats response: %v\n", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
 	})
 
 	return http.ListenAndServe(":"+port, mux)
@@ -489,7 +501,11 @@ func (b *Broker) persistMessage(topic string, msg Message) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("Warning: failed to close file: %v\n", err)
+		}
+	}()
 
 	// Write message as JSON line
 	msgData := map[string]interface{}{

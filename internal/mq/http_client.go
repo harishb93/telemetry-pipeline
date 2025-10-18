@@ -29,7 +29,12 @@ func (h *HTTPBroker) Publish(topic string, msg Message) error {
 	if err != nil {
 		return fmt.Errorf("failed to publish to %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Can't return error from defer, just log
+			fmt.Printf("Warning: failed to close response body: %v\n", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("publish failed with status %d", resp.StatusCode)

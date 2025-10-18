@@ -18,7 +18,7 @@ services:
       - BROKER_PORT=9000
       - CHECKPOINT_ENABLED=true
       - LOG_LEVEL=INFO
-      - LOG_FORMAT=text
+      - LOG_FORMAT=json
     volumes:
       - collector-data:/data
       - collector-mq:/var/lib/mq
@@ -46,7 +46,7 @@ services:
       - RATE=10.0
       - WORKERS=2
       - LOG_LEVEL=INFO
-      - LOG_FORMAT=text
+      - LOG_FORMAT=json
     volumes:
       # Mount sample CSV data (create this file first)
       - ./sample-data/telemetry.csv:/data/telemetry.csv:ro
@@ -74,7 +74,7 @@ services:
       - COLLECTOR_PORT=8080
       - COLLECTOR_URL=http://telemetry-collector:8080
       - LOG_LEVEL=INFO
-      - LOG_FORMAT=text
+      - LOG_FORMAT=json
     volumes:
       - collector-data:/data:ro
     depends_on:

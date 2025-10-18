@@ -8,7 +8,11 @@ import (
 
 func TestFileStore(t *testing.T) {
 	filePath := "test_data.json"
-	defer os.Remove(filePath)
+	defer func() {
+		if err := os.Remove(filePath); err != nil {
+			t.Logf("Failed to remove test file: %v", err)
+		}
+	}()
 
 	store := NewFileStore(filePath)
 

@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -413,11 +414,15 @@ func (h *Handlers) parseTimeRange(r *http.Request) (*time.Time, *time.Time, erro
 
 // getCollectorStats fetches stats from the collector service via HTTP
 func (h *Handlers) getCollectorStats() (*CollectorStats, error) {
-	resp, err := http.Get(h.collectorURL + "/stats")
+	resp, err := http.Get(h.collectorURL + "/health")
 	if err != nil {
-		return nil, fmt.Errorf("failed to call collector stats endpoint: %w", err)
+		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Failed to close response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("collector stats endpoint returned status %d", resp.StatusCode)
@@ -453,7 +458,11 @@ func (h *Handlers) getTelemetryData(gpuID string, startTime, endTime *time.Time,
 	if err != nil {
 		return nil, fmt.Errorf("failed to call collector telemetry endpoint: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Failed to close response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("collector telemetry endpoint returned status %d", resp.StatusCode)
@@ -517,7 +526,11 @@ func (h *Handlers) getAllHosts() ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to call collector hosts endpoint: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Failed to close response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("collector hosts endpoint returned status %d", resp.StatusCode)
@@ -541,7 +554,11 @@ func (h *Handlers) getGPUsForHost(hostname string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to call collector host GPUs endpoint: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Failed to close response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, fmt.Errorf("no data found for host")

@@ -140,13 +140,17 @@ func createTestHandlers(t *testing.T) (*Handlers, func()) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Set the collector URL to point to our test collector
-	os.Setenv("COLLECTOR_URL", "http://localhost:8899")
+	if err := os.Setenv("COLLECTOR_URL", "http://localhost:8899"); err != nil {
+		t.Fatalf("Failed to set environment variable: %v", err)
+	}
 	handlers := NewHandlers(coll)
 
 	// Return cleanup function
 	cleanup := func() {
 		coll.Stop()
-		os.Unsetenv("COLLECTOR_URL")
+		if err := os.Unsetenv("COLLECTOR_URL"); err != nil {
+			t.Logf("Failed to unset environment variable: %v", err)
+		}
 	}
 
 	return handlers, cleanup

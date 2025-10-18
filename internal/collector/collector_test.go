@@ -264,7 +264,9 @@ func TestCheckpointManager(t *testing.T) {
 
 	// Clean up any existing checkpoint data for isolation
 	checkpointName := "worker-1"
-	collector.checkpointMgr.DeleteCheckpoint(checkpointName)
+	if err := collector.checkpointMgr.DeleteCheckpoint(checkpointName); err != nil {
+		t.Logf("Failed to delete checkpoint (may not exist): %v", err)
+	}
 
 	// Test updating processed count
 	err := collector.checkpointMgr.UpdateProcessedCount(checkpointName, 100)

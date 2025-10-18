@@ -27,7 +27,12 @@ func (fs *FileStore) Save(data interface{}) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			// Note: Can't return error from defer, just log
+			fmt.Printf("Warning: failed to close file: %v\n", err)
+		}
+	}()
 
 	encoder := json.NewEncoder(file)
 	return encoder.Encode(data)
@@ -41,7 +46,11 @@ func (fs *FileStore) Load(target interface{}) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("Warning: failed to close file: %v\n", err)
+		}
+	}()
 
 	decoder := json.NewDecoder(file)
 	return decoder.Decode(target)
@@ -102,7 +111,11 @@ func (fs *FileStorage) WriteTelemetry(telemetry interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to open file %s: %w", filePath, err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("Warning: failed to close file: %v\n", err)
+		}
+	}()
 
 	// Marshal telemetry data to JSON
 	jsonData, err := json.Marshal(telemetry)
@@ -129,7 +142,11 @@ func (fs *FileStorage) ReadTelemetryFile(gpuID string) ([]json.RawMessage, error
 		}
 		return nil, fmt.Errorf("failed to open file %s: %w", filePath, err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("Warning: failed to close file: %v\n", err)
+		}
+	}()
 
 	var messages []json.RawMessage
 	decoder := json.NewDecoder(file)
