@@ -2,6 +2,26 @@
 
 A comprehensive, production-ready telemetry pipeline built in Go that implements the pattern: **CSV Streamers → Custom MQ → Collectors → Storage**. This system is designed for high-throughput GPU telemetry data processing with horizontal scalability, fault tolerance, and comprehensive monitoring.
 
+## 🛡️ Quality Assurance
+
+### Main Branch Status
+[![CI](https://github.com/harishb93/telemetry-pipeline/workflows/CI/badge.svg?branch=main)](https://github.com/harishb93/telemetry-pipeline/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/harishb93/telemetry-pipeline/workflows/CodeQL/badge.svg?branch=main)](https://github.com/harishb93/telemetry-pipeline/actions/workflows/codeql.yml)
+[![Release](https://github.com/harishb93/telemetry-pipeline/workflows/Release/badge.svg)](https://github.com/harishb93/telemetry-pipeline/actions/workflows/release.yml)
+
+### Code Quality
+[![Go Report Card](https://goreportcard.com/badge/github.com/harishb93/telemetry-pipeline)](https://goreportcard.com/report/github.com/harishb93/telemetry-pipeline)
+[![codecov](https://codecov.io/gh/harishb93/telemetry-pipeline/branch/main/graph/badge.svg?token=YOUR_CODECOV_TOKEN)](https://codecov.io/gh/harishb93/telemetry-pipeline)
+[![Maintainability](https://api.codeclimate.com/v1/badges/YOUR_REPO_ID/maintainability)](https://codeclimate.com/github/harishb93/telemetry-pipeline/maintainability)
+
+## 📊 Project Status
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Version](https://img.shields.io/badge/Go-1.24+-blue.svg)](https://golang.org/)
+[![Latest Release](https://img.shields.io/github/release/harishb93/telemetry-pipeline.svg)](https://github.com/harishb93/telemetry-pipeline/releases)
+[![Docker](https://img.shields.io/badge/Docker-supported-blue.svg)](https://www.docker.com/)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-ready-green.svg)](https://kubernetes.io/)
+
 ## 🏗️ Architecture
 
 ```
@@ -208,6 +228,32 @@ go test ./internal/collector -bench=BenchmarkTelemetryConversion
 # MQ performance
 go test ./internal/mq -bench=.
 ```
+
+## 🚀 CI/CD Pipeline
+
+### Automated Quality Assurance
+Our CI/CD pipeline runs on **every branch** and **every pull request** to ensure code quality:
+
+- **✅ Continuous Integration**: Automated testing, linting, and building on all branches
+- **🔒 Security Analysis**: CodeQL security scanning and vulnerability checks
+- **📊 Code Coverage**: Automatic coverage reporting with Codecov integration
+- **🏗️ Multi-Environment Testing**: Unit tests, integration tests, and Docker builds
+- **📚 Documentation**: Automatic API documentation generation
+- **🐳 Container Testing**: Docker image building and validation
+
+### Pipeline Stages
+1. **Unit & Integration Tests** - Comprehensive test suite with coverage reporting
+2. **Code Quality Checks** - Linting, formatting, and static analysis
+3. **Security Scanning** - CodeQL analysis and vulnerability detection
+4. **Docker Build** - Container image creation and validation
+5. **Documentation** - API docs generation and validation
+
+### Quality Gates
+- ✅ All tests must pass
+- ✅ Code coverage maintained
+- ✅ No security vulnerabilities
+- ✅ Docker builds successful
+- ✅ Linting and formatting checks pass
 
 ## 📁 Data Formats
 
