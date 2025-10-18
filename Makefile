@@ -42,12 +42,22 @@ build-mq:
 # Test targets
 test:
 	@echo "Running unit and integration tests with coverage..."
-	@set -e; \
-	pkgs=$$(go list ./... | grep -v '/tests/'); \
+	@pkgs=$$(go list ./... | grep -v '/tests/'); \
+	mode_written=false; \
+	rm -f coverage.out; \
 	for p in $$pkgs; do \
-		GOTOOLCHAIN=local go test $$p -v -coverprofile=coverage_$$(echo $$p | tr '/' '-').out -tags="!system" || exit $$?; \
-	done; \
-	cat coverage_*.out > coverage.out
+		echo "Testing $$p"; \
+		GOTOOLCHAIN=local go test $$p -v -covermode=atomic -coverprofile=profile.out -tags="!system" || exit $$?; \
+		if [ -f profile.out ]; then \
+			if ! $$mode_written; then \
+				cat profile.out > coverage.out; \
+				mode_written=true; \
+			else \
+				grep -h -v "^mode:" profile.out >> coverage.out; \
+			fi; \
+			rm -f profile.out; \
+		fi; \
+	done
 	@echo "Coverage profile saved to coverage.out"
 
 coverage: test
