@@ -42,7 +42,12 @@ build-mq:
 # Test targets
 test:
 	@echo "Running unit and integration tests with coverage..."
-	GOTOOLCHAIN=local go test $(shell go list ./... | grep -v '/tests/') -v -coverprofile=coverage.out -tags="!system"
+	@set -e; \
+	pkgs=$$(go list ./... | grep -v '/tests/'); \
+	for p in $$pkgs; do \
+		GOTOOLCHAIN=local go test $$p -v -coverprofile=coverage_$$(echo $$p | tr '/' '-').out -tags="!system" || exit $$?; \
+	done; \
+	cat coverage_*.out > coverage.out
 	@echo "Coverage profile saved to coverage.out"
 
 coverage: test

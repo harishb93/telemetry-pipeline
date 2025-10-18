@@ -191,7 +191,7 @@ func (s *HTTPMQService) handlePublish(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to read request body", http.StatusBadRequest)
 		return
 	}
-	defer r.Body.Close()
+	defer func() { _ = r.Body.Close() }()
 
 	msg := mq.Message{
 		Payload: body,
@@ -207,7 +207,7 @@ func (s *HTTPMQService) handlePublish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	_ = json.NewEncoder(w).Encode(map[string]string{
 		"status":     "published",
 		"topic":      topic,
 		"message_id": messageID,
@@ -216,7 +216,7 @@ func (s *HTTPMQService) handlePublish(w http.ResponseWriter, r *http.Request) {
 
 func (s *HTTPMQService) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":    "healthy",
 		"service":   "mq-service",
 		"timestamp": time.Now().UTC(),
@@ -226,7 +226,7 @@ func (s *HTTPMQService) handleHealth(w http.ResponseWriter, r *http.Request) {
 func (s *HTTPMQService) handleStats(w http.ResponseWriter, r *http.Request) {
 	stats := s.broker.GetStats()
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(stats)
+	_ = json.NewEncoder(w).Encode(stats)
 }
 
 func (s *HTTPMQService) Start() error {
@@ -246,11 +246,7 @@ func (s *HTTPMQService) Stop() error {
 	return s.httpServer.Shutdown(ctx)
 }
 
-var startTime time.Time
-
 func main() {
-	startTime = time.Now()
-
 	// Initialize logger
 	log := logger.NewFromEnv().WithComponent("mq-service")
 

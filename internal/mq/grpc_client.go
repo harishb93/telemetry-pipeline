@@ -36,7 +36,7 @@ func NewGRPCBrokerClient(serverAddr string) (*GRPCBrokerClient, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Connect to gRPC server
-	conn, err := grpc.Dial(serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to connect to gRPC server at %s: %w", serverAddr, err)
@@ -205,7 +205,7 @@ func (g *GRPCBrokerClient) Close() {
 	// Close connection
 	g.cancel()
 	if g.conn != nil {
-		g.conn.Close()
+		_ = g.conn.Close()
 	}
 }
 

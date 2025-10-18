@@ -32,7 +32,7 @@ func (d *DirectBrokerClient) Publish(topic string, msg Message) error {
 	if err != nil {
 		return fmt.Errorf("failed to publish to %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("publish failed with status %d", resp.StatusCode)
@@ -97,7 +97,7 @@ func (d *DirectBrokerClient) pollMessages(topic string, msgCh chan Message, stop
 							Ack:     func() {}, // No-op ack since we already consumed from HTTP
 						}:
 						case <-stopCh:
-							resp.Body.Close()
+							_ = resp.Body.Close()
 							return
 						default:
 							// Channel full, skip message
@@ -105,7 +105,7 @@ func (d *DirectBrokerClient) pollMessages(topic string, msgCh chan Message, stop
 					}
 				}
 			}
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 	}
 }
