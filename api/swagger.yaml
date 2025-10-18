@@ -1,68 +1,6 @@
 basePath: /api/v1
 definitions:
-  api.ErrorResponse:
-    properties:
-      code:
-        type: integer
-      error:
-        type: string
-      message:
-        type: string
-    type: object
-  api.GPUResponse:
-    properties:
-      gpus:
-        items:
-          type: string
-        type: array
-      pagination:
-        $ref: '#/definitions/api.PaginationMetadata'
-      total:
-        type: integer
-    type: object
-  api.HostGPUsResponse:
-    properties:
-      gpus:
-        items:
-          type: string
-        type: array
-      hostname:
-        type: string
-      total:
-        type: integer
-    type: object
-  api.HostsResponse:
-    properties:
-      hosts:
-        items:
-          type: string
-        type: array
-      pagination:
-        $ref: '#/definitions/api.PaginationMetadata'
-      total:
-        type: integer
-    type: object
-  api.PaginationMetadata:
-    properties:
-      has_next:
-        type: boolean
-      limit:
-        type: integer
-      offset:
-        type: integer
-    type: object
-  api.TelemetryResponse:
-    properties:
-      data:
-        items:
-          $ref: '#/definitions/collector.Telemetry'
-        type: array
-      pagination:
-        $ref: '#/definitions/api.PaginationMetadata'
-      total:
-        type: integer
-    type: object
-  collector.Telemetry:
+  github_com_harishb93_telemetry-pipeline_internal_collector.Telemetry:
     properties:
       gpu_id:
         type: string
@@ -75,6 +13,68 @@ definitions:
         type: object
       timestamp:
         type: string
+    type: object
+  internal_api.ErrorResponse:
+    properties:
+      code:
+        type: integer
+      error:
+        type: string
+      message:
+        type: string
+    type: object
+  internal_api.GPUResponse:
+    properties:
+      gpus:
+        items:
+          type: string
+        type: array
+      pagination:
+        $ref: '#/definitions/internal_api.PaginationMetadata'
+      total:
+        type: integer
+    type: object
+  internal_api.HostGPUsResponse:
+    properties:
+      gpus:
+        items:
+          type: string
+        type: array
+      hostname:
+        type: string
+      total:
+        type: integer
+    type: object
+  internal_api.HostsResponse:
+    properties:
+      hosts:
+        items:
+          type: string
+        type: array
+      pagination:
+        $ref: '#/definitions/internal_api.PaginationMetadata'
+      total:
+        type: integer
+    type: object
+  internal_api.PaginationMetadata:
+    properties:
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+    type: object
+  internal_api.TelemetryResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/github_com_harishb93_telemetry-pipeline_internal_collector.Telemetry'
+        type: array
+      pagination:
+        $ref: '#/definitions/internal_api.PaginationMetadata'
+      total:
+        type: integer
     type: object
 host: localhost:8081
 info:
@@ -109,15 +109,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.GPUResponse'
+            $ref: '#/definitions/internal_api.GPUResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
       summary: Get all GPU IDs
       tags:
       - GPUs
@@ -155,38 +155,22 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.TelemetryResponse'
+            $ref: '#/definitions/internal_api.TelemetryResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
       summary: Get telemetry data for a GPU
       tags:
       - Telemetry
-  /health:
-    get:
-      consumes:
-      - application/json
-      description: Returns the health status of the API service
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Health check
-      tags:
-      - Health
   /hosts:
     get:
       consumes:
@@ -207,15 +191,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.HostsResponse'
+            $ref: '#/definitions/internal_api.HostsResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
       summary: Get all host names
       tags:
       - Hosts
@@ -236,19 +220,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.HostGPUsResponse'
+            $ref: '#/definitions/internal_api.HostGPUsResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
       summary: Get GPU IDs for a host
       tags:
       - Hosts

@@ -65,7 +65,7 @@ func TestNewStreamer(t *testing.T) {
 	broker := mq.NewBroker(config)
 	defer broker.Close()
 
-	streamer := NewStreamer("test.csv", 2, 10.0, broker)
+	streamer := NewStreamer("test.csv", 2, 10.0, "test-topic", broker)
 
 	if streamer.csvPath != "test.csv" {
 		t.Errorf("Expected csvPath to be 'test.csv', got %s", streamer.csvPath)
@@ -103,7 +103,7 @@ func TestStreamerBasicFunctionality(t *testing.T) {
 	defer unsubscribe()
 
 	// Create and start streamer
-	streamer := NewStreamer(csvPath, 1, 5.0, broker) // 5 messages per second
+	streamer := NewStreamer(csvPath, 1, 5.0, "telemetry", broker) // 5 messages per second
 	err = streamer.Start()
 	if err != nil {
 		t.Fatalf("Failed to start streamer: %v", err)
@@ -166,7 +166,7 @@ func TestStreamerMultipleWorkers(t *testing.T) {
 
 	// Create streamer with multiple workers
 	workers := 3
-	streamer := NewStreamer(csvPath, workers, 10.0, broker)
+	streamer := NewStreamer(csvPath, workers, 10.0, "telemetry", broker)
 	err = streamer.Start()
 	if err != nil {
 		t.Fatalf("Failed to start streamer: %v", err)
@@ -208,7 +208,7 @@ func TestStreamerGracefulShutdown(t *testing.T) {
 	defer broker.Close()
 
 	// Create streamer
-	streamer := NewStreamer(csvPath, 2, 1.0, broker)
+	streamer := NewStreamer(csvPath, 2, 1.0, "telemetry", broker)
 	err := streamer.Start()
 	if err != nil {
 		t.Fatalf("Failed to start streamer: %v", err)
@@ -251,7 +251,7 @@ func TestStreamerContinuousLoop(t *testing.T) {
 	defer unsubscribe()
 
 	// Create streamer
-	streamer := NewStreamer(csvPath, 1, 10.0, broker)
+	streamer := NewStreamer(csvPath, 1, 10.0, "telemetry", broker)
 	err = streamer.Start()
 	if err != nil {
 		t.Fatalf("Failed to start streamer: %v", err)
@@ -303,7 +303,7 @@ func TestStreamerRateControl(t *testing.T) {
 
 	// Test with slower rate
 	rate := 2.0 // 2 messages per second
-	streamer := NewStreamer(csvPath, 1, rate, broker)
+	streamer := NewStreamer(csvPath, 1, rate, "telemetry", broker)
 	err = streamer.Start()
 	if err != nil {
 		t.Fatalf("Failed to start streamer: %v", err)
@@ -355,7 +355,7 @@ func TestParseRecord(t *testing.T) {
 	broker := mq.NewBroker(config)
 	defer broker.Close()
 
-	streamer := NewStreamer("", 1, 1.0, broker)
+	streamer := NewStreamer("", 1, 1.0, "test-topic", broker)
 
 	headers := []string{"gpu_id", "utilization", "temperature", "active"}
 	record := []string{"gpu0", "85.5", "72.3", "true"}
@@ -392,7 +392,7 @@ func TestParseRecordMismatchedLength(t *testing.T) {
 	broker := mq.NewBroker(config)
 	defer broker.Close()
 
-	streamer := NewStreamer("", 1, 1.0, broker)
+	streamer := NewStreamer("", 1, 1.0, "test-topic", broker)
 
 	headers := []string{"gpu_id", "utilization"}
 	record := []string{"gpu0"} // Missing one field
@@ -464,7 +464,7 @@ func BenchmarkStreamerThroughput(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		streamer := NewStreamer(csvPath, 1, 100.0, broker) // High rate for benchmark
+		streamer := NewStreamer(csvPath, 1, 100.0, "telemetry", broker) // High rate for benchmark
 		if err := streamer.Start(); err != nil {
 			b.Fatalf("Failed to start streamer: %v", err)
 		}

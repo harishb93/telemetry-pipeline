@@ -353,8 +353,8 @@ func TestHealth(t *testing.T) {
 		t.Errorf("Expected status 'healthy', got %v", response["status"])
 	}
 
-	if response["service"] != "telemetry-api" {
-		t.Errorf("Expected service 'telemetry-api', got %v", response["service"])
+	if response["service"] != "telemetry-api-gateway" {
+		t.Errorf("Expected service 'telemetry-api-gateway', got %v", response["service"])
 	}
 
 	if response["version"] != "1.0.0" {
