@@ -22,6 +22,18 @@ A comprehensive, production-ready telemetry pipeline built in Go that implements
 [![Docker](https://img.shields.io/badge/Docker-supported-blue.svg)](https://www.docker.com/)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-ready-green.svg)](https://kubernetes.io/)
 
+### 📊 Badge Meanings
+
+- **CI Badge**: Shows the build status of the main branch
+- **CodeQL Badge**: Indicates security analysis status
+- **Release Badge**: Shows the release workflow status
+- **Go Report Card**: Automated code quality assessment
+- **Codecov**: Test coverage percentage
+- **License**: Project licensing information
+- **Go Version**: Minimum Go version required
+- **Latest Release**: Most recent tagged release
+- **Docker/Kubernetes**: Platform compatibility indicators
+
 ## 🏗️ Architecture
 
 ```
@@ -254,6 +266,8 @@ Our CI/CD pipeline runs on **every branch** and **every pull request** to ensure
 - ✅ No security vulnerabilities
 - ✅ Docker builds successful
 - ✅ Linting and formatting checks pass
+
+> **Note**: The CI pipeline now runs on **all branches**, not just main and develop. This ensures early feedback on feature branches and comprehensive testing across the entire development workflow.
 
 ## 📁 Data Formats
 
