@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package mq;
+
+option go_package = "github.com/harishb93/telemetry-pipeline/proto";
+
+// MQService defines the gRPC interface for the Message Queue service
+service MQService {
+  // Publish a message to a topic
+  rpc Publish(PublishRequest) returns (PublishResponse);
+  
+  // Subscribe to a topic (server streaming)
+  rpc Subscribe(SubscribeRequest) returns (stream Message);
+  
+  // Health check
+  rpc Health(HealthRequest) returns (HealthResponse);
+  
+  // Get statistics
+  rpc GetStats(StatsRequest) returns (StatsResponse);
+}
+
+// PublishRequest represents a request to publish a message
+message PublishRequest {
+  string topic = 1;
+  bytes payload = 2;
+  map<string, string> headers = 3;
+}
+
+// PublishResponse represents the response to a publish request
+message PublishResponse {
+  string message_id = 1;
+  bool success = 2;
+  string error = 3;
+}
+
+// SubscribeRequest represents a request to subscribe to a topic
+message SubscribeRequest {
+  string topic = 1;
+  string consumer_group = 2;
+  int32 batch_size = 3;
+  int32 timeout_seconds = 4;
+}
+
+// Message represents a message in the queue
+message Message {
+  string id = 1;
+  string topic = 2;
+  bytes payload = 3;
+  int64 timestamp = 4;
+  map<string, string> headers = 5;
+}
+
+// HealthRequest represents a health check request
+message HealthRequest {}
+
+// HealthResponse represents a health check response
+message HealthResponse {
+  string status = 1;
+  int64 timestamp = 2;
+  string service = 3;
+  string version = 4;
+}
+
+// StatsRequest represents a request for statistics
+message StatsRequest {}
+
+// StatsResponse represents statistics response
+message StatsResponse {
+  map<string, TopicStats> topics = 1;
+  int64 total_messages = 2;
+  int64 timestamp = 3;
+}
+
+// TopicStats represents statistics for a specific topic
+message TopicStats {
+  string topic = 1;
+  int64 queue_size = 2;
+  int32 subscriber_count = 3;
+  int64 pending_messages = 4;
+  int64 published_messages = 5;
+  int64 consumed_messages = 6;
+}
