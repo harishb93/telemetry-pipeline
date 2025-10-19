@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,6 +19,148 @@ import (
 type TelemetryData struct {
 	Timestamp time.Time              `json:"timestamp"`
 	Fields    map[string]interface{} `json:"fields"`
+}
+
+// PreProcessCSVByHostNames filters the CSV file by the provided hostnames and creates a new filtered CSV file
+func PreProcessCSVByHostNames(csvPath, hostList string) (string, error) {
+	log := logger.NewFromEnv().WithComponent("preprocessor")
+
+	if hostList == "" {
+		return csvPath, nil // No filtering needed
+	}
+
+	// Parse comma-separated host list
+	hostnames := strings.Split(strings.TrimSpace(hostList), ",")
+	for i, hostname := range hostnames {
+		hostnames[i] = strings.TrimSpace(hostname)
+	}
+
+	log.Info("Starting CSV preprocessing",
+		"source_file", csvPath,
+		"hostnames", hostnames,
+		"hostname_count", len(hostnames))
+
+	// Open source CSV file
+	sourceFile, err := os.Open(csvPath)
+	if err != nil {
+		return csvPath, fmt.Errorf("failed to open source CSV file: %w", err)
+	}
+	defer func() {
+		if err := sourceFile.Close(); err != nil {
+			log.Warn("Failed to close source file", "error", err)
+		}
+	}()
+
+	// Create CSV reader
+	reader := csv.NewReader(sourceFile)
+
+	// Read headers
+	headers, err := reader.Read()
+	if err != nil {
+		return csvPath, fmt.Errorf("failed to read CSV headers: %w", err)
+	}
+
+	// Find hostname column index
+	hostnameIndex := -1
+	for i, header := range headers {
+		if strings.ToLower(strings.TrimSpace(header)) == "hostname" {
+			hostnameIndex = i
+			break
+		}
+	}
+
+	// If hostname column not found, return original file path
+	if hostnameIndex == -1 {
+		log.Debug("Hostname column not found in CSV headers", "headers", headers)
+		return csvPath, nil
+	}
+
+	// Create temporary filtered file
+	tempFile, err := os.CreateTemp("", "filtered_telemetry_*.csv")
+	if err != nil {
+		return csvPath, fmt.Errorf("failed to create temporary file: %w", err)
+	}
+	tempFilePath := tempFile.Name()
+
+	defer func() {
+		if err := tempFile.Close(); err != nil {
+			log.Warn("Failed to close temp file", "error", err)
+		}
+	}()
+
+	// Create CSV writer
+	writer := csv.NewWriter(tempFile)
+	defer writer.Flush()
+
+	// Write headers to filtered file
+	if err := writer.Write(headers); err != nil {
+		os.Remove(tempFilePath) // Clean up on error
+		return csvPath, fmt.Errorf("failed to write headers to filtered file: %w", err)
+	}
+
+	// Create hostname lookup map for efficient filtering
+	hostnameMap := make(map[string]bool)
+	for _, hostname := range hostnames {
+		if hostname != "" {
+			hostnameMap[hostname] = true
+		}
+	}
+
+	// Filter and write matching records
+	recordsRead := 0
+	recordsWritten := 0
+
+	for {
+		record, err := reader.Read()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			log.Warn("Error reading CSV record", "error", err, "records_read", recordsRead)
+			continue
+		}
+
+		recordsRead++
+
+		// Check if record has enough columns
+		if len(record) <= hostnameIndex {
+			log.Warn("Record has insufficient columns", "record_index", recordsRead, "columns", len(record), "expected_hostname_index", hostnameIndex)
+			continue
+		}
+
+		// Check if hostname matches any in the filter list
+		recordHostname := strings.TrimSpace(record[hostnameIndex])
+		if hostnameMap[recordHostname] {
+			if err := writer.Write(record); err != nil {
+				log.Warn("Failed to write filtered record", "error", err, "record_index", recordsRead)
+				continue
+			}
+			recordsWritten++
+		}
+	}
+
+	// Flush writer to ensure all data is written
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		os.Remove(tempFilePath) // Clean up on error
+		return csvPath, fmt.Errorf("failed to flush CSV writer: %w", err)
+	}
+
+	log.Info("CSV preprocessing completed",
+		"source_file", csvPath,
+		"filtered_file", tempFilePath,
+		"records_read", recordsRead,
+		"records_written", recordsWritten,
+		"hostname_column_index", hostnameIndex)
+
+	// If no records were written, return original file path
+	if recordsWritten == 0 {
+		log.Warn("No records matched the hostname filter, proceeding with original file")
+		os.Remove(tempFilePath) // Clean up empty file
+		return csvPath, nil
+	}
+
+	return tempFilePath, nil
 }
 
 // Streamer handles streaming CSV data to MQ
@@ -142,7 +285,7 @@ func (s *Streamer) worker(workerID int, headers []string) {
 }
 
 // processCSVLoop processes the entire CSV file once
-func (s *Streamer) processCSVLoop(workerID int, headers []string, recordsProcessed *int, rateInterval time.Duration, workerLogger *logger.Logger) error {
+func (s *Streamer) processCSVLoop(_ int, headers []string, recordsProcessed *int, rateInterval time.Duration, workerLogger *logger.Logger) error {
 	file, err := os.Open(s.csvPath)
 	if err != nil {
 		return err

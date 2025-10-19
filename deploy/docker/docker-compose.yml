@@ -79,7 +79,7 @@ services:
       - BROKER_URL=http://mq-service:9090
       - TOPIC=telemetry
       - RATE=1.0
-      - WORKERS=10
+      - WORKERS=1
       - LOG_LEVEL=INFO
       - LOG_FORMAT=json
     volumes:
