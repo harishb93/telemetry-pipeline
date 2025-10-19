@@ -302,8 +302,27 @@ func convertToFloat64(v interface{}) (float64, error) {
 func (c *Collector) startHealthServer() error {
 	mux := http.NewServeMux()
 
+	// Add CORS middleware wrapper
+	corsHandler := func(h http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			// Set CORS headers
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+			// Handle preflight requests
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+
+			// Call the original handler
+			h(w, r)
+		}
+	}
+
 	// Health check endpoint
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/health", corsHandler(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -315,10 +334,10 @@ func (c *Collector) startHealthServer() error {
 		if _, err := w.Write([]byte(`{"status":"healthy","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`)); err != nil {
 			c.logger.Error("Failed to write health response", "error", err)
 		}
-	})
+	}))
 
 	// Stats endpoint
-	mux.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/stats", corsHandler(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -330,7 +349,7 @@ func (c *Collector) startHealthServer() error {
 			c.logger.Error("Failed to encode stats response", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}
-	})
+	}))
 
 	// Telemetry endpoint for specific GPU
 	mux.HandleFunc("/api/v1/gpus/", func(w http.ResponseWriter, r *http.Request) {

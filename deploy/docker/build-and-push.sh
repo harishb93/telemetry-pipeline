@@ -101,7 +101,7 @@ build_and_push_component() {
 verify_images() {
     log_info "Verifying images in registry..."
     
-    local components=("telemetry-streamer" "telemetry-collector" "api-gateway")
+    local components=("mq-service" "telemetry-streamer" "telemetry-collector" "api-gateway" "dashboard")
     
     for component in "${components[@]}"; do
         if curl -f http://${REGISTRY_URL}/v2/${component}/tags/list >/dev/null 2>&1; then
@@ -188,9 +188,11 @@ main() {
     start_registry
     
     # Build and push each component
+    build_and_push_component "mq-service" "mq-service.Dockerfile"
     build_and_push_component "telemetry-streamer" "telemetry-streamer.Dockerfile"
     build_and_push_component "telemetry-collector" "telemetry-collector.Dockerfile"
     build_and_push_component "api-gateway" "api-gateway.Dockerfile"
+    build_and_push_component "dashboard" "dashboard.Dockerfile"
     
     # Verify all images are in registry
     verify_images
@@ -202,16 +204,20 @@ main() {
     # Show image information
     echo ""
     log_info "Built images:"
+    echo "  - ${REGISTRY_URL}/mq-service:${IMAGE_TAG}"
     echo "  - ${REGISTRY_URL}/telemetry-streamer:${IMAGE_TAG}"
     echo "  - ${REGISTRY_URL}/telemetry-collector:${IMAGE_TAG}"
     echo "  - ${REGISTRY_URL}/api-gateway:${IMAGE_TAG}"
+    echo "  - ${REGISTRY_URL}/dashboard:${IMAGE_TAG}"
     
     # Show example usage
     echo ""
     log_info "Example usage in Kubernetes:"
+    echo "  kubectl run mq-service --image=${REGISTRY_URL}/mq-service:${IMAGE_TAG}"
     echo "  kubectl run telemetry-streamer --image=${REGISTRY_URL}/telemetry-streamer:${IMAGE_TAG}"
     echo "  kubectl run telemetry-collector --image=${REGISTRY_URL}/telemetry-collector:${IMAGE_TAG}"
     echo "  kubectl run api-gateway --image=${REGISTRY_URL}/api-gateway:${IMAGE_TAG}"
+    echo "  kubectl run dashboard --image=${REGISTRY_URL}/dashboard:${IMAGE_TAG}"
     
     echo ""
     log_info "For Kind cluster integration:"

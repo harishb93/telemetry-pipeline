@@ -141,6 +141,14 @@ check_services() {
     
     log_info "Checking service health..."
     
+    # Check MQ service health
+    if curl -f http://localhost:9090/health >/dev/null 2>&1; then
+        log_success "✓ MQ Service is healthy"
+    else
+        log_error "✗ MQ Service is not responding"
+        failed=1
+    fi
+    
     # Check collector health
     if curl -f http://localhost:8080/health >/dev/null 2>&1; then
         log_success "✓ Telemetry Collector is healthy"
@@ -157,6 +165,14 @@ check_services() {
         failed=1
     fi
     
+    # Check dashboard health
+    if curl -f http://localhost:5173/ >/dev/null 2>&1; then
+        log_success "✓ Dashboard is healthy"
+    else
+        log_error "✗ Dashboard is not responding"
+        failed=1
+    fi
+    
     if [ $failed -eq 0 ]; then
         log_success "All services are healthy!"
         show_endpoints
@@ -169,9 +185,11 @@ check_services() {
 show_endpoints() {
     echo ""
     log_info "Service endpoints:"
-    echo "  🏥 Collector Health:  http://localhost:8080/health"
-    echo "  📊 Collector Metrics: http://localhost:8080/stats"
+    echo "  � Dashboard:         http://localhost:5173"
     echo "  🏥 MQ Health:         http://localhost:9090/health"
+    echo "  📊 MQ Stats:          http://localhost:9090/stats"
+    echo "  🏥 Collector Health:  http://localhost:8080/health"
+    echo "  📊 Collector Stats:   http://localhost:8080/stats"
     echo "  🌐 API Gateway:       http://localhost:8081"
     echo "  🏥 Gateway Health:    http://localhost:8081/health"
     echo "  📚 API Documentation: http://localhost:8081/swagger/"

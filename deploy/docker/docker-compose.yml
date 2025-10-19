@@ -42,7 +42,7 @@ services:
       - "8080:8080"    # Health endpoint
       - "9091:9091"    # Metrics endpoint
     environment:
-      - WORKERS=2
+      - WORKERS=4
       - DATA_DIR=/data
       - MAX_ENTRIES=10000
       - HEALTH_PORT=8080
@@ -78,8 +78,8 @@ services:
       - CSV_FILE=/data/telemetry.csv
       - BROKER_URL=http://mq-service:9090
       - TOPIC=telemetry
-      - RATE=5.0
-      - WORKERS=2
+      - RATE=1.0
+      - WORKERS=10
       - LOG_LEVEL=INFO
       - LOG_FORMAT=json
     volumes:
@@ -127,6 +127,32 @@ services:
       start_period: 20s
     restart: unless-stopped
     user: "1000:1000"
+
+  # Dashboard - React web interface
+  dashboard:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/dashboard.Dockerfile
+    image: localhost:5000/dashboard:latest
+    container_name: dashboard
+    ports:
+      - "5173:80"      # Dashboard web interface
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      mq-service:
+        condition: service_healthy
+      telemetry-collector:
+        condition: service_healthy
+    networks:
+      - telemetry
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
 
 volumes:
   # Persistent storage for collected telemetry data

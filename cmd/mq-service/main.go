@@ -160,9 +160,9 @@ func NewHTTPMQService(broker *mq.Broker, port string, logger *logger.Logger) *HT
 	}
 
 	router := mux.NewRouter()
-	router.HandleFunc("/publish/{topic}", service.handlePublish).Methods("POST")
-	router.HandleFunc("/health", service.handleHealth).Methods("GET")
-	router.HandleFunc("/stats", service.handleStats).Methods("GET")
+	router.HandleFunc("/publish/{topic}", service.handlePublish).Methods("POST", "OPTIONS")
+	router.HandleFunc("/health", service.handleHealth).Methods("GET", "OPTIONS")
+	router.HandleFunc("/stats", service.handleStats).Methods("GET", "OPTIONS")
 
 	service.httpServer = &http.Server{
 		Addr:              ":" + port,
@@ -177,6 +177,17 @@ func NewHTTPMQService(broker *mq.Broker, port string, logger *logger.Logger) *HT
 }
 
 func (s *HTTPMQService) handlePublish(w http.ResponseWriter, r *http.Request) {
+	// Set CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	// Handle preflight requests
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	vars := mux.Vars(r)
 	topic := vars["topic"]
 
@@ -215,6 +226,17 @@ func (s *HTTPMQService) handlePublish(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *HTTPMQService) handleHealth(w http.ResponseWriter, r *http.Request) {
+	// Set CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	// Handle preflight requests
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":    "healthy",
@@ -224,6 +246,17 @@ func (s *HTTPMQService) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *HTTPMQService) handleStats(w http.ResponseWriter, r *http.Request) {
+	// Set CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	// Handle preflight requests
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	stats := s.broker.GetStats()
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(stats)

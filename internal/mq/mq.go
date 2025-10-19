@@ -372,8 +372,30 @@ func (b *Broker) GetStats() AdminStats {
 func (b *Broker) StartAdminServer(port string) error {
 	mux := http.NewServeMux()
 
+	// Add CORS middleware wrapper
+	corsHandler := func(h http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			// Set CORS headers
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+			// Debug: Log that CORS handler is being called
+			fmt.Printf("CORS: Handling %s %s with origin: %s\n", r.Method, r.URL.Path, r.Header.Get("Origin"))
+
+			// Handle preflight requests
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+
+			// Call the original handler
+			h(w, r)
+		}
+	}
+
 	// Stats endpoint
-	mux.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/stats", corsHandler(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -386,10 +408,10 @@ func (b *Broker) StartAdminServer(port string) error {
 			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 			return
 		}
-	})
+	}))
 
 	// Health check endpoint
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/health", corsHandler(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -409,10 +431,10 @@ func (b *Broker) StartAdminServer(port string) error {
 			fmt.Printf("Warning: failed to encode health response: %v\n", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}
-	})
+	}))
 
 	// Publish endpoint for HTTP clients
-	mux.HandleFunc("/publish/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/publish/", corsHandler(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -445,10 +467,10 @@ func (b *Broker) StartAdminServer(port string) error {
 			fmt.Printf("Warning: failed to encode publish response: %v\n", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}
-	})
+	}))
 
 	// Topic-specific stats endpoint
-	mux.HandleFunc("/stats/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/stats/", corsHandler(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -480,7 +502,7 @@ func (b *Broker) StartAdminServer(port string) error {
 			fmt.Printf("Warning: failed to encode stats response: %v\n", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}
-	})
+	}))
 
 	return http.ListenAndServe(":"+port, mux)
 }

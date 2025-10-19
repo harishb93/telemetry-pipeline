@@ -13,7 +13,10 @@ docker compose up -d --build
 # 2. Wait a few seconds for services to start, then check health
 curl http://localhost:8081/health
 
-# 3. Query the API
+# 3. Open the dashboard
+open http://localhost:5173
+
+# 4. Query the API
 curl http://localhost:8081/api/v1/gpus
 
 # Stop everything
@@ -26,28 +29,42 @@ For more control or to use the registry, see [Building Images](#building-images)
 
 ## Components
 
-### 1. Telemetry Streamer
+### 1. Message Queue Service
+- **Image**: `mq-service`
+- **Purpose**: Standalone message broker for telemetry data
+- **Ports**: 
+  - `9090`: MQ HTTP API
+  - `9092`: MQ gRPC API
+- **Configuration**: Environment variables for persistence, retries, timeouts
+
+### 2. Telemetry Streamer
 - **Image**: `telemetry-streamer`
 - **Purpose**: Streams GPU telemetry data from CSV files
 - **Ports**: No external ports (communicates via message queue)
 - **Configuration**: Environment variables for CSV file path, rate, workers
 
-### 2. Telemetry Collector  
+### 3. Telemetry Collector  
 - **Image**: `telemetry-collector`
 - **Purpose**: Collects and processes telemetry data via message queue
 - **Ports**: 
   - `8080`: Health endpoint
-  - `9000`: Message broker
   - `9091`: Metrics endpoint
 - **Configuration**: Environment variables for workers, data directory, persistence
 
-### 3. API Gateway
+### 4. API Gateway
 - **Image**: `api-gateway`
 - **Purpose**: Provides REST API access to telemetry data
 - **Ports**:
   - `8081`: HTTP API
-  - `9092`: Metrics endpoint
+  - `9093`: Metrics endpoint
 - **Configuration**: Environment variables for port, data directory
+
+### 5. Dashboard
+- **Image**: `dashboard`
+- **Purpose**: React web interface for telemetry monitoring
+- **Ports**:
+  - `5173`: Web dashboard (via Nginx)
+- **Configuration**: Proxy configuration for API access
 
 ## Building Images
 
@@ -67,6 +84,9 @@ For more control or to use the registry, see [Building Images](#building-images)
 ### Manual Build (Individual Components)
 
 ```bash
+# Build mq-service
+docker build -f deploy/docker/mq-service.Dockerfile -t mq-service:latest .
+
 # Build telemetry-streamer
 docker build -f deploy/docker/telemetry-streamer.Dockerfile -t telemetry-streamer:latest .
 
@@ -75,6 +95,9 @@ docker build -f deploy/docker/telemetry-collector.Dockerfile -t telemetry-collec
 
 # Build api-gateway
 docker build -f deploy/docker/api-gateway.Dockerfile -t api-gateway:latest .
+
+# Build dashboard
+docker build -f deploy/docker/dashboard.Dockerfile -t dashboard:latest .
 ```
 
 ## Running Containers
