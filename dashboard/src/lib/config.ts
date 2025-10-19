@@ -8,6 +8,7 @@ export const POLLING_INTERVALS = {
   TELEMETRY: 5000, // 5 seconds
   HEALTH: 10000, // 10 seconds
   STATS: 5000, // 5 seconds
+  DASHBOARD: 10000, // 10 seconds - for GPU/host list updates
 };
 
 // API endpoints - Dynamic based on environment

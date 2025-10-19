@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search, Server, Cpu, ChevronRight } from 'lucide-react';
+import { Search, Server, Cpu, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { apiClient } from '@/api/client';
@@ -11,6 +11,8 @@ interface HostInfo {
   gpus: string[];
 }
 
+const HOSTS_PER_PAGE = 5;
+
 export function HostsOverview() {
   const [hosts, setHosts] = useState<HostInfo[]>([]);
   const [filteredHosts, setFilteredHosts] = useState<HostInfo[]>([]);
@@ -19,6 +21,7 @@ export function HostsOverview() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedHost, setExpandedHost] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Fetch hosts data
   const fetchHostsData = async () => {
@@ -71,17 +74,33 @@ export function HostsOverview() {
       );
       setFilteredHosts(filtered);
     }
+    // Reset to first page when search changes
+    setCurrentPage(1);
   }, [hosts, searchQuery]);
 
   // Initial load and polling
   useEffect(() => {
     fetchHostsData();
-    const interval = setInterval(fetchHostsData, POLLING_INTERVALS.STATS);
+    const interval = setInterval(fetchHostsData, POLLING_INTERVALS.DASHBOARD);
     return () => clearInterval(interval);
   }, []);
 
   const toggleHostExpansion = (hostname: string) => {
     setExpandedHost(expandedHost === hostname ? null : hostname);
+  };
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredHosts.length / HOSTS_PER_PAGE);
+  const startIndex = (currentPage - 1) * HOSTS_PER_PAGE;
+  const endIndex = startIndex + HOSTS_PER_PAGE;
+  const paginatedHosts = filteredHosts.slice(startIndex, endIndex);
+
+  const handlePrevPage = () => {
+    setCurrentPage(prev => Math.max(prev - 1, 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage(prev => Math.min(prev + 1, totalPages));
   };
 
   if (isLoading) {
@@ -198,14 +217,22 @@ export function HostsOverview() {
 
         {/* Hosts Table */}
         <div className="space-y-2">
-          <h3 className="text-lg font-semibold">Hosts</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Hosts</h3>
+            {totalPages > 1 && (
+              <div className="text-sm text-gray-600">
+                Showing {startIndex + 1}-{Math.min(endIndex, filteredHosts.length)} of {filteredHosts.length}
+              </div>
+            )}
+          </div>
+          
           {filteredHosts.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               {searchQuery ? 'No hosts match your search' : 'No hosts found'}
             </div>
           ) : (
             <div className="space-y-2">
-              {filteredHosts.map((host) => (
+              {paginatedHosts.map((host) => (
                 <div key={host.hostname} className="border border-gray-200 rounded-lg">
                   <div
                     className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50"
@@ -251,6 +278,31 @@ export function HostsOverview() {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center space-x-2 pt-4">
+              <button
+                onClick={handlePrevPage}
+                disabled={currentPage === 1}
+                className="flex items-center px-3 py-2 border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Previous
+              </button>
+              <span className="px-3 py-2 text-sm">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={handleNextPage}
+                disabled={currentPage === totalPages}
+                className="flex items-center px-3 py-2 border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </button>
             </div>
           )}
         </div>

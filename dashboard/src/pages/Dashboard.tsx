@@ -4,6 +4,7 @@ import { Header } from '@/components/DashboardLayout';
 import { HealthPanel } from '@/components/HealthPanel';
 import { MQOverview } from '@/components/MQOverview';
 import { HostsOverview } from '@/components/HostsOverview';
+import { GPUSelection } from '@/components/GPUSelection';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { apiClient } from '@/api/client';
@@ -24,11 +25,7 @@ export function Dashboard() {
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch GPU list once
-  const [gpus, setGpus] = useState<string[]>([]);
-  const [hosts, setHosts] = useState<string[]>([]);
-
-  console.log('Dashboard: Rendering with:', { gpus: gpus.length, hosts: hosts.length, selectedGpu, isLoading });
+  console.log('Dashboard: Rendering with:', { selectedGpu, isLoading });
 
 
 
@@ -41,32 +38,20 @@ export function Dashboard() {
     }
   );
 
-  // Load initial data
+    // Load initial data
   useEffect(() => {
     const loadInitialData = async () => {
       try {
         console.log('Dashboard: Loading initial data...');
-        const [gpuList, hostList] = await Promise.all([
-          apiClient.getGpus(),
-          apiClient.getHosts(),
-        ]);
-        console.log('Dashboard: Loaded data:', { gpus: gpuList?.length, hosts: hostList?.length });
-        setGpus(gpuList || []);
-        setHosts(hostList || []);
-        
-        // Select first GPU by default
-        if (gpuList.length > 0 && !selectedGpu) {
-          setSelectedGpu(gpuList[0]);
-        }
         setIsLoading(false);
       } catch (error) {
-        console.error('Failed to load initial data:', error);
+        console.error('Dashboard: Error in initial load:', error);
         setIsLoading(false);
       }
     };
 
     loadInitialData();
-  }, [selectedGpu]);
+  }, []);
 
   // Update chart data when telemetry data changes
   useEffect(() => {
@@ -130,36 +115,13 @@ export function Dashboard() {
         
         <div className="space-y-4">
         {/* GPU Selection */}
-        <Card>
-          <CardHeader>
-            <CardTitle>GPU Selection</CardTitle>
-            <CardDescription>
-              {(gpus || []).length} GPUs available, {(hosts || []).length} hosts
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {(gpus || []).map((gpu) => (
-                <button
-                  key={gpu}
-                  onClick={() => setSelectedGpu(gpu)}
-                  className={`px-3 py-1 rounded text-sm border transition-colors ${
-                    selectedGpu === gpu
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white hover:bg-gray-50 hover:text-gray-900 border-gray-200'
-                  }`}
-                >
-                  {gpu}
-                </button>
-              ))}
-            </div>
-            {selectedGpu && (
-              <p className="text-sm text-gray-600 mt-2">
-                Selected: {selectedGpu} • {telemetryData?.total || 0} data points
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <ErrorBoundary componentName="GPUSelection">
+          <GPUSelection 
+            selectedGpu={selectedGpu}
+            onGpuSelect={setSelectedGpu}
+            telemetryDataPoints={telemetryData?.total || 0}
+          />
+        </ErrorBoundary>
 
         {/* Telemetry Chart */}
         {chartData.length > 0 && (
