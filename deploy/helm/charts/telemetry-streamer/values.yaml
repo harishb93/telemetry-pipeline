@@ -16,8 +16,8 @@ configMap:
 env:
   # Comma-separated list of hostnames to filter
   # Leave empty to process all hostnames
-  - name: HOSTNAME_LIST
-    value: "mtv5-dgx1-hgpu-031,mtv5-dgx1-hgpu-022,mtv5-dgx1-hgpu-010"
+  # - name: HOSTNAME_LIST
+  #   value: "mtv5-dgx1-hgpu-031,mtv5-dgx1-hgpu-022,mtv5-dgx1-hgpu-010"
   - name: MQ_BROKER_URL
     value: "tcp://mq-service:9091"
   - name: CSV_FILE_PATH
@@ -34,7 +34,7 @@ resources:
     memory: 128Mi
 
 healthCheck:
-  enabled: true
+  enabled: false
   livenessProbe:
     exec:
       command:

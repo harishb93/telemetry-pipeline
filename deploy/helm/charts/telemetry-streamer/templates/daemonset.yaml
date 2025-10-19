@@ -25,8 +25,8 @@ spec:
             - "-csv-file=/app/data/telemetry.csv"
             - "-broker-url=http://mq-service:9090"
             - "-topic=telemetry"
-            - "-rate=10.0"
-            - "-workers=2"
+            - "-rate=1.0"
+            - "-workers=10"
           env:
             {{- toYaml .Values.env | nindent 12 }}
             # Add node name as environment variable

@@ -1,205 +1,406 @@
-# GPU Telemetry Pipeline - Helm Charts# GPU Telemetry Pipeline - Helm Deployment Guide# Telemetry Pipeline Helm Chart
+# GPU Telemetry Pipeline - Quick Start# GPU Telemetry Pipeline - Helm Charts# GPU Telemetry Pipeline - Helm Deployment Guide# Telemetry Pipeline Helm Chart
 
 
 
-This directory contains Helm charts for deploying the complete GPU Telemetry Pipeline to Kubernetes.
+This directory contains the complete Helm charts and quick start script for deploying the GPU Telemetry Pipeline.
 
 
 
-## Chart StructureThis guide provides comprehensive instructions for deploying the GPU Telemetry Pipeline using Helm charts.This Helm chart deploys a complete GPU telemetry pipeline on Kubernetes, consisting of three main components:
+## Quick StartThis directory contains Helm charts for deploying the complete GPU Telemetry Pipeline to Kubernetes.
 
 
 
-```
+### Prerequisites
+
+
+
+Ensure you have the following tools installed:## Chart StructureThis guide provides comprehensive instructions for deploying the GPU Telemetry Pipeline using Helm charts.This Helm chart deploys a complete GPU telemetry pipeline on Kubernetes, consisting of three main components:
+
+- Docker
+
+- Kind (Kubernetes in Docker)
+
+- kubectl
+
+- Helm```
+
+- curl
 
 deploy/helm/
 
+### One-Command Setup
+
 ├── telemetry-pipeline/          # Umbrella chart for complete stack## Overview- **Telemetry Streamer**: DaemonSet that streams GPU telemetry data from CSV files
 
-│   ├── Chart.yaml
+```bash
 
-│   ├── values.yaml- **Telemetry Collector**: Deployment that collects and processes telemetry data via message queue
+cd deploy/helm│   ├── Chart.yaml
 
-│   └── templates/
+./quickstart.sh
 
-│       └── NOTES.txtThe GPU Telemetry Pipeline consists of the following components:- **API Gateway**: Deployment that provides REST API access to telemetry data
+```│   ├── values.yaml- **Telemetry Collector**: Deployment that collects and processes telemetry data via message queue
 
-└── charts/                      # Individual component charts
+
+
+This will:│   └── templates/
+
+1. ✅ Create a Kind cluster with local registry
+
+2. ✅ Build and push all Docker images│       └── NOTES.txtThe GPU Telemetry Pipeline consists of the following components:- **API Gateway**: Deployment that provides REST API access to telemetry data
+
+3. ✅ Deploy all components with Helm
+
+4. ✅ Set up port forwarding└── charts/                      # Individual component charts
+
+5. ✅ Show access URLs
 
     ├── shared-resources/        # Namespace, ConfigMaps, PVCs
 
+### Access URLs
+
     ├── mq-service/             # Message Queue (StatefulSet)
 
-    ├── telemetry-collector/    # Data Collector (StatefulSet)1. **Shared Resources** - Namespace, ConfigMaps, and PVCs## Prerequisites
+After successful deployment:
 
-    ├── telemetry-streamer/     # Data Streamer (DaemonSet)
+- **Dashboard**: http://localhost:8080    ├── telemetry-collector/    # Data Collector (StatefulSet)1. **Shared Resources** - Namespace, ConfigMaps, and PVCs## Prerequisites
 
-    ├── api-gateway/            # API Gateway (Deployment)2. **MQ Service** - Message queue (StatefulSet with persistent storage)
+- **API Gateway**: http://localhost:8081
 
-    └── dashboard/              # Web Dashboard (Deployment)
-
-```3. **Telemetry Collector** - Data collector (StatefulSet with persistent storage)- Kubernetes 1.16+
+- **Health Check**: http://localhost:8081/health    ├── telemetry-streamer/     # Data Streamer (DaemonSet)
 
 
 
-## Quick Start4. **Telemetry Streamer** - CSV data streamer (DaemonSet)- Helm 3.0+
+## Commands    ├── api-gateway/            # API Gateway (Deployment)2. **MQ Service** - Message queue (StatefulSet with persistent storage)
 
 
 
-### Deploy Complete Stack5. **API Gateway** - REST API service (Deployment with autoscaling)- Persistent Volume provisioner support in the underlying infrastructure (for data persistence)
+### Full Setup    └── dashboard/              # Web Dashboard (Deployment)
+
+```bash
+
+./quickstart.sh up                    # Full setup (default)```3. **Telemetry Collector** - Data collector (StatefulSet with persistent storage)- Kubernetes 1.16+
+
+./quickstart.sh up -t v1.0.0          # Setup with specific image tag
+
+./quickstart.sh --skip-build          # Skip building, use existing images
+
+./quickstart.sh --skip-cluster        # Use existing cluster
+
+```## Quick Start4. **Telemetry Streamer** - CSV data streamer (DaemonSet)- Helm 3.0+
 
 
 
-```bash6. **Dashboard** - React frontend (Deployment with Ingress)
+### Status and Monitoring
 
-# Navigate to helm directory
+```bash
 
-cd deploy/helm## Architecture
+./quickstart.sh status                # Show deployment status### Deploy Complete Stack5. **API Gateway** - REST API service (Deployment with autoscaling)- Persistent Volume provisioner support in the underlying infrastructure (for data persistence)
 
+./quickstart.sh logs                  # Show component logs
 
-
-# Install the complete pipeline## Architecture
-
-helm install gpu-telemetry telemetry-pipeline/
+./quickstart.sh port-forward          # Restart port forwarding
 
 ```
 
-# Or with custom values
+```bash6. **Dashboard** - React frontend (Deployment with Ingress)
+
+### Cleanup
+
+```bash# Navigate to helm directory
+
+./quickstart.sh down                  # Cleanup everything
+
+```cd deploy/helm## Architecture
+
+
+
+## Manual Deployment Order
+
+
+
+If you prefer manual deployment, use this order:# Install the complete pipeline## Architecture
+
+
+
+```bashhelm install gpu-telemetry telemetry-pipeline/
+
+# 1. Create cluster and registry (if needed)
+
+kind create cluster --config=kind-config.yaml```
+
+
+
+# 2. Build and push images# Or with custom values
+
+../docker/build-and-push.sh
 
 helm install gpu-telemetry telemetry-pipeline/ \```┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 
-  --set global.namespace=my-telemetry \
+# 3. Deploy in order
 
-  --set dashboard.ingress.enabled=true \┌─────────────────────────────────────────────────────────────────┐│  Streamer       │    │   Collector      │    │   API Gateway   │
+helm install shared-resources charts/shared-resources/  --set global.namespace=my-telemetry \
 
-  --set dashboard.ingress.hosts[0].host=telemetry.mydomain.com
+helm install mq-service charts/mq-service/ --namespace gpu-telemetry
+
+helm install telemetry-collector charts/telemetry-collector/ --namespace gpu-telemetry  --set dashboard.ingress.enabled=true \┌─────────────────────────────────────────────────────────────────┐│  Streamer       │    │   Collector      │    │   API Gateway   │
+
+helm install api-gateway charts/api-gateway/ --namespace gpu-telemetry
+
+helm install dashboard charts/dashboard/ --namespace gpu-telemetry  --set dashboard.ingress.hosts[0].host=telemetry.mydomain.com
+
+helm install telemetry-streamer charts/telemetry-streamer/ --namespace gpu-telemetry
 
 ```│                          Kubernetes Cluster                     ││  (DaemonSet)    │───▶│  (Deployment)    │───▶│  (Deployment)   │
 
+# 4. Port forwarding
 
+kubectl port-forward -n gpu-telemetry svc/api-gateway 8081:8081 &
 
-### Deploy Individual Components├─────────────────────────────────────────────────────────────────┤│                 │    │                  │    │                 │
+kubectl port-forward service/dashboard 8080:80 -n gpu-telemetry &
 
-
-
-```bash│  Default Namespace                 │  gpu-telemetry Namespace    ││ • CSV Data      │    │ • Message Queue  │    │ • REST API      │
-
-# Deploy only shared resources (namespace, PVCs, ConfigMaps)
-
-helm install shared-resources charts/shared-resources/│  ┌─────────────────┐              │  ┌─────────────────────────┐ ││ • Rate Control  │    │ • Persistence    │    │ • OpenAPI Spec  │
+```### Deploy Individual Components├─────────────────────────────────────────────────────────────────┤│                 │    │                  │    │                 │
 
 
 
-# Deploy message queue│  │   Dashboard     │◄─────────────┼──┤      API Gateway       │ ││ • Multi-Node    │    │ • Health Checks  │    │ • Ingress       │
-
-helm install mq-service charts/mq-service/ \
-
-  --dependency-update│  │  (Deployment)   │              │  │     (Deployment)       │ │└─────────────────┘    └──────────────────┘    └─────────────────┘
+## Components
 
 
+
+### Individual Charts```bash│  Default Namespace                 │  gpu-telemetry Namespace    ││ • CSV Data      │    │ • Message Queue  │    │ • REST API      │
+
+- `charts/shared-resources/` - Namespace and common resources
+
+- `charts/mq-service/` - Redis message queue (StatefulSet)# Deploy only shared resources (namespace, PVCs, ConfigMaps)
+
+- `charts/telemetry-collector/` - Data collection service (StatefulSet)
+
+- `charts/api-gateway/` - REST API gateway (Deployment)helm install shared-resources charts/shared-resources/│  ┌─────────────────┐              │  ┌─────────────────────────┐ ││ • Rate Control  │    │ • Persistence    │    │ • OpenAPI Spec  │
+
+- `charts/dashboard/` - React web dashboard (Deployment)
+
+- `charts/telemetry-streamer/` - Data streaming service (Deployment)
+
+
+
+### Service Dependencies# Deploy message queue│  │   Dashboard     │◄─────────────┼──┤      API Gateway       │ ││ • Multi-Node    │    │ • Health Checks  │    │ • Ingress       │
+
+```
+
+Dashboard → API Gateway → Telemetry Collector → MQ Servicehelm install mq-service charts/mq-service/ \
+
+                     ↗                      ↗
+
+         Telemetry Streamer ──────────────────  --dependency-update│  │  (Deployment)   │              │  │     (Deployment)       │ │└─────────────────┘    └──────────────────┘    └─────────────────┘
+
+```
+
+
+
+## Configuration
 
 # Deploy collector│  │   + Ingress     │              │  │    + Autoscaling       │ │```
 
-helm install telemetry-collector charts/telemetry-collector/ \
+### Environment Variables
 
-  --dependency-update│  └─────────────────┘              │  └─────────────────────────┘ │
+- `IMAGE_TAG` - Docker image tag (default: latest)helm install telemetry-collector charts/telemetry-collector/ \
 
+- `SKIP_BUILD` - Skip image building (default: false)
 
-
-# Deploy streamer│           │                       │              │               │## Installation
-
-helm install telemetry-streamer charts/telemetry-streamer/ \
-
-  --dependency-update│           └───────────────────────┼──────────────┘               │
+- `SKIP_CLUSTER` - Skip cluster creation (default: false)  --dependency-update│  └─────────────────┘              │  └─────────────────────────┘ │
 
 
 
-# Deploy API gateway│                                   │                              │### Quick Start
+### Command Line Options
 
-helm install api-gateway charts/api-gateway/
+- `-t, --tag TAG` - Image tag
 
-│                                   │  ┌─────────────────────────┐ │
+- `-c, --cluster NAME` - Cluster name (default: kind)# Deploy streamer│           │                       │              │               │## Installation
+
+- `-n, --namespace NS` - Kubernetes namespace (default: gpu-telemetry)
+
+- `--skip-build` - Skip building imageshelm install telemetry-streamer charts/telemetry-streamer/ \
+
+- `--skip-cluster` - Skip cluster creation
+
+- `--debug` - Enable debug output  --dependency-update│           └───────────────────────┼──────────────┘               │
+
+
+
+## Troubleshooting
+
+
+
+### Check Status# Deploy API gateway│                                   │                              │### Quick Start
+
+```bash
+
+./quickstart.sh statushelm install api-gateway charts/api-gateway/
+
+kubectl get pods -n gpu-telemetry
+
+kubectl get services -n gpu-telemetry│                                   │  ┌─────────────────────────┐ │
+
+```
 
 # Deploy dashboard
 
-helm install dashboard charts/dashboard/│                                   │  │  Telemetry Collector    │ │```bash
+### View Logs
+
+```bashhelm install dashboard charts/dashboard/│                                   │  │  Telemetry Collector    │ │```bash
+
+./quickstart.sh logs
+
+kubectl logs -f -n gpu-telemetry <pod-name>```
 
 ```
 
 │                                   │  │    (StatefulSet)        │ │# Add the repository (if available)
 
-## Production Deployment
+### Registry Issues
 
-│                                   │  │      + PVC              │ │helm repo add telemetry-pipeline https://charts.example.com/telemetry-pipeline
+```bash## Production Deployment
 
-### Prerequisites
+# Check registry
 
-│                                   │  └─────────────────────────┘ │helm repo update
-
-1. **Kubernetes cluster** (v1.20+)
-
-2. **Helm** (v3.0+)│                                   │              │               │
-
-3. **Storage class** for persistent volumes
-
-4. **Ingress controller** (if using ingress)│                                   │  ┌─────────────────────────┐ │# Install with default values
+curl http://localhost:5000/v2/_catalog│                                   │  │      + PVC              │ │helm repo add telemetry-pipeline https://charts.example.com/telemetry-pipeline
 
 
 
-### Production Example│                                   │  │     MQ Service          │ │helm install my-telemetry-pipeline telemetry-pipeline/telemetry-pipeline
+# Check registry connectivity from cluster### Prerequisites
 
+kubectl run debug --rm -i --tty --image=curlimages/curl -- /bin/sh
 
-
-```bash│                                   │  │    (StatefulSet)        │ │
-
-# Deploy with production settings
-
-helm install gpu-telemetry telemetry-pipeline/ \│                                   │  │      + PVC              │ │# Or install from local directory
-
-  --set global.namespace=gpu-telemetry-prod \
-
-  --set global.storageClass=fast-ssd \│                                   │  └─────────────────────────┘ │helm install my-telemetry-pipeline ./deploy/helm/telemetry-pipeline
-
-  --set dashboard.ingress.enabled=true \
-
-  --set dashboard.ingress.hosts[0].host=telemetry.company.com \│                                   │              ▲               │```
-
-  --namespace gpu-telemetry-prod \
-
-  --create-namespace│  ┌─────────────────────────────────┼──────────────┘               │
+curl http://kind-registry:5000/v2/_catalog│                                   │  └─────────────────────────┘ │helm repo update
 
 ```
 
-│  │          Every Node             │                              │### Custom Installation
+1. **Kubernetes cluster** (v1.20+)
 
-## Component Overview
+### Port Forwarding Issues
+
+```bash2. **Helm** (v3.0+)│                                   │              │               │
+
+# Kill existing port forwards
+
+pkill -f "kubectl port-forward"3. **Storage class** for persistent volumes
+
+
+
+# Restart port forwarding4. **Ingress controller** (if using ingress)│                                   │  ┌─────────────────────────┐ │# Install with default values
+
+./quickstart.sh port-forward
+
+```
+
+
+
+### Clean Slate### Production Example│                                   │  │     MQ Service          │ │helm install my-telemetry-pipeline telemetry-pipeline/telemetry-pipeline
+
+```bash
+
+./quickstart.sh down    # Full cleanup
+
+./quickstart.sh up      # Fresh start
+
+``````bash│                                   │  │    (StatefulSet)        │ │
+
+
+
+## Development# Deploy with production settings
+
+
+
+### Rebuilding Single Componenthelm install gpu-telemetry telemetry-pipeline/ \│                                   │  │      + PVC              │ │# Or install from local directory
+
+```bash
+
+# Build specific component  --set global.namespace=gpu-telemetry-prod \
+
+docker build -f deploy/docker/dashboard.Dockerfile -t localhost:5000/dashboard:latest .
+
+docker push localhost:5000/dashboard:latest  --set global.storageClass=fast-ssd \│                                   │  └─────────────────────────┘ │helm install my-telemetry-pipeline ./deploy/helm/telemetry-pipeline
+
+
+
+# Restart deployment  --set dashboard.ingress.enabled=true \
+
+kubectl rollout restart deployment/dashboard -n gpu-telemetry
+
+```  --set dashboard.ingress.hosts[0].host=telemetry.company.com \│                                   │              ▲               │```
+
+
+
+### Updating Charts  --namespace gpu-telemetry-prod \
+
+```bash
+
+# Update specific chart  --create-namespace│  ┌─────────────────────────────────┼──────────────┘               │
+
+helm upgrade dashboard charts/dashboard/ --namespace gpu-telemetry
+
+```
+
+# Update all charts
+
+helm upgrade shared-resources charts/shared-resources/│  │          Every Node             │                              │### Custom Installation
+
+helm upgrade mq-service charts/mq-service/ --namespace gpu-telemetry
+
+# ... etc## Component Overview
+
+```
 
 │  │  ┌─────────────────────────┐    │  ┌─────────────────────────┐ │
 
+## Architecture
+
 ### 1. Shared Resources
 
-- **Type**: Job (creates resources)│  │  │  Telemetry Streamer     │────┼──┤     ConfigMap           │ │```bash
+```
 
-- **Purpose**: Sets up namespace, ConfigMaps, and PersistentVolumeClaims
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐- **Type**: Job (creates resources)│  │  │  Telemetry Streamer     │────┼──┤     ConfigMap           │ │```bash
 
-- **Dependencies**: None│  │  │    (DaemonSet)          │    │  │   (telemetry.csv)       │ │# Install with custom values
+│   Dashboard     │    │   API Gateway   │    │ Telemetry       │
+
+│   (React UI)    │───▶│   (REST API)    │───▶│ Collector       │- **Purpose**: Sets up namespace, ConfigMaps, and PersistentVolumeClaims
+
+│   Port: 80      │    │   Port: 8081    │    │ (Data Ingestion)│
+
+└─────────────────┘    └─────────────────┘    │   Port: 8080    │- **Dependencies**: None│  │  │    (DaemonSet)          │    │  │   (telemetry.csv)       │ │# Install with custom values
+
+                                              └─────────────────┘
+
+                                                       │
+
+                                                       ▼
+
+┌─────────────────┐                          ┌─────────────────┐### 2. Message Queue Service│  │  │  + CSV ConfigMap        │    │  │                         │ │helm install my-telemetry-pipeline ./deploy/helm/telemetry-pipeline \
+
+│ Telemetry       │                          │   MQ Service    │
+
+│ Streamer        │◀─────────────────────────│   (Redis)       │- **Type**: StatefulSet
+
+│ (Stream Proc.)  │                          │   Port: 9090    │
+
+│ Port: 8082      │                          └─────────────────┘- **Purpose**: Provides message queuing for telemetry data│  │  └─────────────────────────┘    │  └─────────────────────────┘ │  --set apiGateway.ingress.enabled=true \
+
+└─────────────────┘
+
+```- **Dependencies**: Shared Resources
 
 
 
-### 2. Message Queue Service│  │  │  + CSV ConfigMap        │    │  │                         │ │helm install my-telemetry-pipeline ./deploy/helm/telemetry-pipeline \
-
-- **Type**: StatefulSet
-
-- **Purpose**: Provides message queuing for telemetry data│  │  └─────────────────────────┘    │  └─────────────────────────┘ │  --set apiGateway.ingress.enabled=true \
-
-- **Dependencies**: Shared Resources
-
-- **Persistence**: Yes (5Gi default)│  └─────────────────────────────────┼──────────────────────────────┤  --set apiGateway.ingress.hosts[0].host=telemetry-api.example.com \
+## Support- **Persistence**: Yes (5Gi default)│  └─────────────────────────────────┼──────────────────────────────┤  --set apiGateway.ingress.hosts[0].host=telemetry-api.example.com \
 
 
 
-### 3. Telemetry Collector└─────────────────────────────────────────────────────────────────┘  --set collector.persistence.size=50Gi \
+For issues or questions:
 
+1. Check the logs: `./quickstart.sh logs`
+
+2. Check status: `./quickstart.sh status`### 3. Telemetry Collector└─────────────────────────────────────────────────────────────────┘  --set collector.persistence.size=50Gi \
+
+3. Try cleanup and restart: `./quickstart.sh down && ./quickstart.sh up`
 - **Type**: StatefulSet
 
 - **Purpose**: Collects and processes telemetry data```  --set streamer.workers=4
