@@ -185,7 +185,7 @@ check_services() {
 show_endpoints() {
     echo ""
     log_info "Service endpoints:"
-    echo "  � Dashboard:         http://localhost:5173"
+    echo "  � Dashboard:          http://localhost:5173"
     echo "  🏥 MQ Health:         http://localhost:9090/health"
     echo "  📊 MQ Stats:          http://localhost:9090/stats"
     echo "  🏥 Collector Health:  http://localhost:8080/health"

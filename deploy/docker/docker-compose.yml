@@ -8,9 +8,9 @@ services:
     container_name: mq-service
     ports:
       - "9090:9090"    # MQ HTTP API
-      - "9092:9092"    # MQ gRPC API
+      - "9091:9091"    # MQ gRPC API
     environment:
-      - GRPC_PORT=9092
+      - GRPC_PORT=9091
       - HTTP_PORT=9090
       - PERSISTENCE_ENABLED=true
       - PERSISTENCE_DIR=/var/lib/mq
@@ -40,13 +40,12 @@ services:
     container_name: telemetry-collector
     ports:
       - "8080:8080"    # Health endpoint
-      - "9091:9091"    # Metrics endpoint
     environment:
       - WORKERS=4
       - DATA_DIR=/data
       - MAX_ENTRIES=10000
       - HEALTH_PORT=8080
-      - MQ_URL=mq-service:9092
+      - MQ_URL=mq-service:9091
       - TOPIC=telemetry
       - CHECKPOINT_ENABLED=true
       - LOG_LEVEL=INFO
