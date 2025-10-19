@@ -47,13 +47,25 @@ class ApiClient {
 
   // API Gateway endpoints
   async getGpus(): Promise<string[]> {
-    const response = await this.fetchWithTimeout(`${API_BASE_URL}${ENDPOINTS.GPUS}`);
-    return this.handleResponse<string[]>(response);
+    // For Docker deployment, use direct endpoint path, otherwise use API_BASE_URL
+    const isDockerDeployment = API_BASE_URL.startsWith('/');
+    const gpusUrl = isDockerDeployment ? ENDPOINTS.GPUS : `${API_BASE_URL}${ENDPOINTS.GPUS}`;
+    
+    console.log('ApiClient.getGpus: Calling URL:', gpusUrl);
+    const response = await this.fetchWithTimeout(gpusUrl);
+    const data = await this.handleResponse<{ gpus: string[] }>(response);
+    return data.gpus || [];
   }
 
   async getHosts(): Promise<string[]> {
-    const response = await this.fetchWithTimeout(`${API_BASE_URL}${ENDPOINTS.HOSTS}`);
-    return this.handleResponse<string[]>(response);
+    // For Docker deployment, use direct endpoint path, otherwise use API_BASE_URL
+    const isDockerDeployment = API_BASE_URL.startsWith('/');
+    const hostsUrl = isDockerDeployment ? ENDPOINTS.HOSTS : `${API_BASE_URL}${ENDPOINTS.HOSTS}`;
+    
+    console.log('ApiClient.getHosts: Calling URL:', hostsUrl);
+    const response = await this.fetchWithTimeout(hostsUrl);
+    const data = await this.handleResponse<{ hosts: string[] }>(response);
+    return data.hosts || [];
   }
 
   async getTelemetry(
@@ -65,7 +77,11 @@ class ApiClient {
       end?: string;
     }
   ): Promise<TelemetryResponse> {
-    const url = new URL(`${API_BASE_URL}${ENDPOINTS.TELEMETRY(gpuId)}`);
+    // For Docker deployment, use direct endpoint path, otherwise use API_BASE_URL
+    const isDockerDeployment = API_BASE_URL.startsWith('/');
+    const telemetryPath = ENDPOINTS.TELEMETRY(gpuId);
+    const baseUrl = isDockerDeployment ? '' : API_BASE_URL;
+    const url = new URL(`${baseUrl}${telemetryPath}`, window.location.origin);
     
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -75,6 +91,7 @@ class ApiClient {
       });
     }
 
+    console.log('ApiClient.getTelemetry: Calling URL:', url.toString());
     const response = await this.fetchWithTimeout(url.toString());
     return this.handleResponse<TelemetryResponse>(response);
   }

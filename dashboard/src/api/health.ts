@@ -62,8 +62,12 @@ class HealthAPI {
   }
 
   async getApiGatewayHealth(): Promise<HealthResponse> {
+    // For Docker deployment, use direct /health path, otherwise use API_BASE_URL
+    const isDockerDeployment = API_BASE_URL.startsWith('/');
+    const healthUrl = isDockerDeployment ? ENDPOINTS.HEALTH : `${API_BASE_URL}${ENDPOINTS.HEALTH}`;
+    
     return this.fetchHealthWithTimeout(
-      `${API_BASE_URL}${ENDPOINTS.HEALTH}`,
+      healthUrl,
       'API Gateway'
     );
   }

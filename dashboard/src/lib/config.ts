@@ -19,8 +19,8 @@ export const ENDPOINTS = {
   HOSTS: isDockerDeployment ? '/v1/hosts' : '/api/v1/hosts',
   TELEMETRY: (gpuId: string) => isDockerDeployment ? `/v1/gpus/${gpuId}/telemetry` : `/api/v1/gpus/${gpuId}/telemetry`,
   
-  // Health endpoints
-  HEALTH: '/health', // API Gateway health
+  // Health endpoints - Fixed for Docker deployment
+  HEALTH: isDockerDeployment ? '/health' : '/health', // Direct /health for both environments
   COLLECTOR_HEALTH: '/health', // Collector health (via COLLECTOR_BASE_URL)
   MQ_HEALTH: '/health', // MQ health (via MQ_BASE_URL) 
   STATS: '/stats', // MQ stats (via MQ_BASE_URL)

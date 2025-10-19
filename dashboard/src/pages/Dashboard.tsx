@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { Header } from '@/components/DashboardLayout';
 import { HealthPanel } from '@/components/HealthPanel';
 import { MQOverview } from '@/components/MQOverview';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { apiClient } from '@/api/client';
 import { usePolling } from '@/lib/usePolling';
@@ -20,10 +21,13 @@ interface ChartData {
 export function Dashboard() {
   const [selectedGpu, setSelectedGpu] = useState<string>('');
   const [chartData, setChartData] = useState<ChartData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Fetch GPU list once
   const [gpus, setGpus] = useState<string[]>([]);
   const [hosts, setHosts] = useState<string[]>([]);
+
+  console.log('Dashboard: Rendering with:', { gpus: gpus.length, hosts: hosts.length, selectedGpu, isLoading });
 
 
 
@@ -40,19 +44,23 @@ export function Dashboard() {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
+        console.log('Dashboard: Loading initial data...');
         const [gpuList, hostList] = await Promise.all([
           apiClient.getGpus(),
           apiClient.getHosts(),
         ]);
-        setGpus(gpuList);
-        setHosts(hostList);
+        console.log('Dashboard: Loaded data:', { gpus: gpuList?.length, hosts: hostList?.length });
+        setGpus(gpuList || []);
+        setHosts(hostList || []);
         
         // Select first GPU by default
         if (gpuList.length > 0 && !selectedGpu) {
           setSelectedGpu(gpuList[0]);
         }
+        setIsLoading(false);
       } catch (error) {
         console.error('Failed to load initial data:', error);
+        setIsLoading(false);
       }
     };
 
@@ -77,6 +85,25 @@ export function Dashboard() {
     }
   }, [telemetryData]);
 
+  console.log('Dashboard: About to render...');
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen flex-col">
+        <Header 
+          title="GPU Telemetry Dashboard" 
+          subtitle="Real-time monitoring and analytics"
+        />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading dashboard...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen flex-col">
       <Header 
@@ -86,10 +113,14 @@ export function Dashboard() {
       
       <div className="flex-1 space-y-6 p-4 pt-6 md:p-8">
         {/* Health Panel */}
-        <HealthPanel />
+        <ErrorBoundary componentName="HealthPanel">
+          <HealthPanel />
+        </ErrorBoundary>
         
         {/* MQ Overview Panel */}
-        <MQOverview />
+        <ErrorBoundary componentName="MQOverview">
+          <MQOverview />
+        </ErrorBoundary>
         
         <div className="space-y-4">
         {/* GPU Selection */}
@@ -97,12 +128,12 @@ export function Dashboard() {
           <CardHeader>
             <CardTitle>GPU Selection</CardTitle>
             <CardDescription>
-              {gpus.length} GPUs available, {hosts.length} hosts
+              {(gpus || []).length} GPUs available, {(hosts || []).length} hosts
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {gpus.map((gpu) => (
+              {(gpus || []).map((gpu) => (
                 <button
                   key={gpu}
                   onClick={() => setSelectedGpu(gpu)}
