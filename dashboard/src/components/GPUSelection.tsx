@@ -1,9 +1,7 @@
-import { useState } from 'react';
-import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { usePolling } from '@/lib/usePolling';
 import { apiClient } from '@/api/client';
-import { POLLING_INTERVALS } from '@/lib/config';
 
 interface GPUSelectionProps {
   selectedGpu: string;
@@ -16,20 +14,33 @@ const ITEMS_PER_PAGE = 12; // Good number for GPU grid display
 export function GPUSelection({ selectedGpu, onGpuSelect, telemetryDataPoints = 0 }: GPUSelectionProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [gpus, setGpus] = useState<string[]>([]);
+  const [hosts, setHosts] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Dynamically fetch GPU and host data every 10 seconds
-  const { data: gpuData } = usePolling(
-    () => apiClient.getGpus(),
-    { interval: POLLING_INTERVALS.DASHBOARD }
-  );
+  // Load GPU and host data
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const [gpuData, hostData] = await Promise.all([
+        apiClient.getGpus(),
+        apiClient.getHosts(),
+      ]);
+      setGpus(gpuData || []);
+      setHosts(hostData || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  const { data: hostData } = usePolling(
-    () => apiClient.getHosts(),
-    { interval: POLLING_INTERVALS.DASHBOARD }
-  );
-
-  const gpus = gpuData || [];
-  const hosts = hostData || [];
+  // Load data on component mount
+  useEffect(() => {
+    loadData();
+  }, []);
 
   // Filter GPUs based on search term
   const filteredGpus = gpus.filter(gpu => 
@@ -63,12 +74,30 @@ export function GPUSelection({ selectedGpu, onGpuSelect, telemetryDataPoints = 0
   return (
     <Card>
       <CardHeader>
-        <CardTitle>GPU Selection</CardTitle>
-        <CardDescription>
-          {gpus.length} GPUs available across {hosts.length} hosts
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>GPU Selection</CardTitle>
+            <CardDescription>
+              {gpus.length} GPUs available across {hosts.length} hosts
+            </CardDescription>
+          </div>
+          <button
+            onClick={loadData}
+            disabled={isLoading}
+            className="flex items-center px-3 py-2 border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-red-800 text-sm">Error: {error}</p>
+          </div>
+        )}
+
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />

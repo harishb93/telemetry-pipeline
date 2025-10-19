@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Search, Server, Cpu, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Search, Server, Cpu, ChevronRight, ChevronLeft, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { apiClient } from '@/api/client';
-import { POLLING_INTERVALS } from '@/lib/config';
 
 interface HostInfo {
   hostname: string;
@@ -78,11 +77,9 @@ export function HostsOverview() {
     setCurrentPage(1);
   }, [hosts, searchQuery]);
 
-  // Initial load and polling
+  // Initial load only (no auto-polling)
   useEffect(() => {
     fetchHostsData();
-    const interval = setInterval(fetchHostsData, POLLING_INTERVALS.DASHBOARD);
-    return () => clearInterval(interval);
   }, []);
 
   const toggleHostExpansion = (hostname: string) => {
@@ -151,13 +148,25 @@ export function HostsOverview() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Server className="h-5 w-5" />
-          Hosts Overview
-        </CardTitle>
-        <CardDescription>
-          {totalHosts} total hosts • {filteredHosts.length} shown
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Server className="h-5 w-5" />
+              Hosts Overview
+            </CardTitle>
+            <CardDescription>
+              {totalHosts} total hosts • {filteredHosts.length} shown
+            </CardDescription>
+          </div>
+          <button
+            onClick={fetchHostsData}
+            disabled={isLoading}
+            className="flex items-center px-3 py-2 border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Search Bar */}

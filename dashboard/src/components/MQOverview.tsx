@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { RefreshCw, AlertCircle, Database, Users, MessageSquare, Clock } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -80,42 +80,6 @@ function TopicMetricsCard({ topic }: { topic: TopicWithName }) {
           <Badge variant={utilizationPercentage > 80 ? 'destructive' : utilizationPercentage > 50 ? 'secondary' : 'default'}>
             {utilizationPercentage}% Utilization
           </Badge>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function TopicsOverviewChart({ topics }: { topics: TopicWithName[] }) {
-  if (topics.length === 0) return null;
-
-  const chartData = topics.map(topic => ({
-    name: topic.name,
-    'Queue Size': topic.queue_size,
-    'Pending Messages': topic.pending_messages,
-    'Subscribers': topic.subscriber_count,
-  }));
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">Topics Overview</CardTitle>
-        <CardDescription>Queue metrics across all topics</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="Queue Size" fill="#8884d8" />
-              <Bar dataKey="Pending Messages" fill="#ff7300" />
-              <Bar dataKey="Subscribers" fill="#82ca9d" />
-            </BarChart>
-          </ResponsiveContainer>
         </div>
       </CardContent>
     </Card>
@@ -360,9 +324,6 @@ export function MQOverview({ className }: MQOverviewProps) {
       )}
 
       <div className="space-y-6">
-        {/* Topics Overview Chart */}
-        {topics.length > 0 && <TopicsOverviewChart topics={topics} />}
-        
         {/* Individual Topic Cards */}
         {topics.length > 0 && (
           <div>
