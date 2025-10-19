@@ -117,6 +117,34 @@ class ApiClient {
     const response = await this.fetchWithTimeout(`${MQ_BASE_URL}${ENDPOINTS.STATS}`);
     return this.handleResponse<MQStats>(response);
   }
+
+  // Host-related endpoints
+  async getHostsWithMetadata(): Promise<{ total: number; hosts: string[] }> {
+    // For Docker deployment, use direct endpoint path, otherwise use API_BASE_URL
+    const isDockerDeployment = API_BASE_URL.startsWith('/');
+    const hostsUrl = isDockerDeployment ? ENDPOINTS.HOSTS : `${API_BASE_URL}${ENDPOINTS.HOSTS}`;
+    
+    console.log('ApiClient.getHostsWithMetadata: Calling URL:', hostsUrl);
+    const response = await this.fetchWithTimeout(hostsUrl);
+    const data = await this.handleResponse<{ total: number; hosts: string[]; pagination?: any }>(response);
+    return {
+      total: data.total || 0,
+      hosts: data.hosts || []
+    };
+  }
+
+  async getHostGpus(hostname: string): Promise<string[]> {
+    // For Docker deployment, use direct endpoint path, otherwise use API_BASE_URL
+    const isDockerDeployment = API_BASE_URL.startsWith('/');
+    const hostGpusPath = isDockerDeployment ? `/v1/hosts/${hostname}/gpus` : `/api/v1/hosts/${hostname}/gpus`;
+    const baseUrl = isDockerDeployment ? '' : API_BASE_URL;
+    const url = `${baseUrl}${hostGpusPath}`;
+    
+    console.log('ApiClient.getHostGpus: Calling URL:', url);
+    const response = await this.fetchWithTimeout(url);
+    const data = await this.handleResponse<{ hostname: string; gpus: string[]; total: number }>(response);
+    return data.gpus || [];
+  }
 }
 
 export const apiClient = new ApiClient();

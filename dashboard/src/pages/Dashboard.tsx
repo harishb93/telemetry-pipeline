@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { Header } from '@/components/DashboardLayout';
 import { HealthPanel } from '@/components/HealthPanel';
 import { MQOverview } from '@/components/MQOverview';
+import { HostsOverview } from '@/components/HostsOverview';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { apiClient } from '@/api/client';
@@ -120,6 +121,11 @@ export function Dashboard() {
         {/* MQ Overview Panel */}
         <ErrorBoundary componentName="MQOverview">
           <MQOverview />
+        </ErrorBoundary>
+
+        {/* Hosts Overview Panel */}
+        <ErrorBoundary componentName="HostsOverview">
+          <HostsOverview />
         </ErrorBoundary>
         
         <div className="space-y-4">
