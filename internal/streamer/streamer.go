@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -375,10 +376,11 @@ func (s *Streamer) parseRecord(headers, record []string) (*TelemetryData, error)
 		value := record[i]
 
 		// Try to parse as different types for better JSON representation
-		if parsedFloat, err := parseFloat(value); err == nil {
-			telemetryData.Fields[header] = parsedFloat
-		} else if parsedBool, err := parseBool(value); err == nil {
+		// Try bool first (for "1", "0", "true", "false", etc.)
+		if parsedBool, err := parseBool(value); err == nil {
 			telemetryData.Fields[header] = parsedBool
+		} else if parsedFloat, err := parseFloat(value); err == nil {
+			telemetryData.Fields[header] = parsedFloat
 		} else {
 			// Keep as string
 			telemetryData.Fields[header] = value
@@ -393,20 +395,19 @@ func parseFloat(s string) (float64, error) {
 	if s == "" {
 		return 0, fmt.Errorf("empty string")
 	}
-	// Simple float parsing - could be more sophisticated
-	var f float64
-	n, err := fmt.Sscanf(s, "%f", &f)
-	if err != nil || n != 1 {
-		return 0, fmt.Errorf("not a float")
+	// Use strconv.ParseFloat for stricter validation
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, fmt.Errorf("not a valid float: %w", err)
 	}
 	return f, nil
 }
 
 func parseBool(s string) (bool, error) {
 	switch s {
-	case "true", "True", "TRUE", "1", "yes", "Yes", "YES":
+	case "true", "True", "TRUE", "yes", "Yes", "YES":
 		return true, nil
-	case "false", "False", "FALSE", "0", "no", "No", "NO":
+	case "false", "False", "FALSE", "no", "No", "NO":
 		return false, nil
 	default:
 		return false, fmt.Errorf("not a boolean")
