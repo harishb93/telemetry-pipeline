@@ -21,12 +21,6 @@ spec:
         - name: telemetry-streamer
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          args:
-            - "-csv-file=/app/data/telemetry.csv"
-            - "-broker-url=http://mq-service:9090"
-            - "-topic=telemetry"
-            - "-rate=1.0"
-            - "-workers=10"
           env:
             {{- toYaml .Values.env | nindent 12 }}
             # Add node name as environment variable
@@ -42,10 +36,6 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          volumeMounts:
-            - name: telemetry-data
-              mountPath: {{ .Values.configMap.mountPath }}
-              readOnly: true
           {{- if .Values.healthCheck.enabled }}
           livenessProbe:
             {{- toYaml .Values.healthCheck.livenessProbe | nindent 12 }}
@@ -54,13 +44,6 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-      volumes:
-        - name: telemetry-data
-          configMap:
-            name: {{ .Values.configMap.name }}
-            items:
-              - key: telemetry.csv
-                path: {{ .Values.configMap.fileName }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

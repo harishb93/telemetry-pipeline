@@ -2,7 +2,7 @@
 set -e
 
 # Default values
-CSV_FILE=${CSV_FILE:-"/data/telemetry.csv"}
+CSV_FILE=${CSV_FILE:-"/app/data/telemetry.csv"}
 BROKER_URL=${BROKER_URL:-"http://localhost:9090"}
 TOPIC=${TOPIC:-"telemetry"}
 RATE=${RATE:-"10.0"}

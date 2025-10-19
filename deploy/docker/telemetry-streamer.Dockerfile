@@ -38,6 +38,11 @@ RUN addgroup -g 1000 nonroot && adduser -u 1000 -G nonroot -s /sbin/nologin -D n
 # Create data directory with proper permissions
 RUN mkdir -p /data && chown -R nonroot:nonroot /data
 
+# Create app data directory and copy telemetry CSV data
+RUN mkdir -p /app/data
+COPY deploy/docker/sample-data/telemetry.csv /app/data/telemetry.csv
+RUN chown -R nonroot:nonroot /app
+
 # Switch to non-root user
 USER nonroot:nonroot
 
