@@ -1,0 +1,92 @@
+# Default values for telemetry-collector
+replicaCount: 1
+
+image:
+  repository: localhost:5000/telemetry-collector
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  ports:
+    http: 8080
+    metrics: 9091
+
+namespace: gpu-telemetry
+
+persistence:
+  enabled: true
+  existingClaim: collector-data-pvc
+  mountPath: /app/data
+
+# MQ service dependency
+mqService:
+  enabled: true
+  serviceName: mq-service
+  adminPort: 9090
+  brokerPort: 9092
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+env:
+  - name: MQ_URL
+    value: "http://mq-service:9090"
+  - name: DATA_DIR
+    value: "/app/data"
+  - name: HEALTH_PORT
+    value: "8080"
+  - name: WORKERS
+    value: "4"
+  - name: MAX_ENTRIES
+    value: "10000"
+  - name: MQ_TOPIC
+    value: "telemetry"
+
+healthCheck:
+  enabled: true
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 8080
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# Init container to wait for MQ service
+initContainer:
+  enabled: true
+  image:
+    repository: busybox
+    tag: "1.35"
+  command:
+    - /bin/sh
+    - -c
+    - |
+      until nc -z mq-service 9090; do
+        echo "Waiting for MQ service..."
+        sleep 2
+      done
+      echo "MQ service is ready!"
+
+labels:
+  app: gpu-telemetry
+  component: collector
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

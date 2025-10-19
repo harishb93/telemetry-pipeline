@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "telemetry-collector.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "telemetry-collector.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "telemetry-collector.fullname" . }}
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "telemetry-collector.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "telemetry-collector.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.initContainer.enabled }}
+      initContainers:
+        - name: wait-for-mq
+          image: "{{ .Values.initContainer.image.repository }}:{{ .Values.initContainer.image.tag }}"
+          command:
+            {{- toYaml .Values.initContainer.command | nindent 12 }}
+      {{- end }}
+      containers:
+        - name: telemetry-collector
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.ports.http }}
+              protocol: TCP
+            - name: metrics
+              containerPort: {{ .Values.service.ports.metrics }}
+              protocol: TCP
+          env:
+            {{- toYaml .Values.env | nindent 12 }}
+          volumeMounts:
+            - name: collector-data
+              mountPath: {{ .Values.persistence.mountPath }}
+          {{- if .Values.healthCheck.enabled }}
+          livenessProbe:
+            {{- toYaml .Values.healthCheck.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.healthCheck.readinessProbe | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: collector-data
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,53 @@
+# Default values for mq-service
+replicaCount: 1
+
+image:
+  repository: localhost:5000/mq-service
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  ports:
+    admin: 9090
+    broker: 9091
+
+namespace: gpu-telemetry
+
+persistence:
+  enabled: true
+  existingClaim: mq-data-pvc
+  mountPath: /var/lib/mq
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+env: []
+
+healthCheck:
+  enabled: true
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 9090
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 9090
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+labels:
+  app: gpu-telemetry
+  component: mq
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

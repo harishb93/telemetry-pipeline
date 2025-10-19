@@ -1,0 +1,113 @@
+# Default values for dashboard
+replicaCount: 2
+
+image:
+  repository: localhost:5000/dashboard
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 5173
+
+namespace: default  # Dashboard runs in default namespace for easier access
+
+# API Gateway service dependency
+apiGateway:
+  enabled: true
+  serviceName: api-gateway
+  namespace: gpu-telemetry
+  port: 8081
+
+# Ingress configuration for external access
+ingress:
+  enabled: false
+  className: "nginx"  # or whatever ingress controller you're using
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: gpu-telemetry.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+    # - secretName: gpu-telemetry-tls
+    #   hosts:
+    #     - gpu-telemetry.local
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+env:
+  - name: VITE_API_BASE_URL
+    value: "http://api-gateway.gpu-telemetry.svc.cluster.local:8081"
+  - name: VITE_REFRESH_INTERVAL
+    value: "30000"  # 30 seconds
+  - name: NODE_ENV
+    value: "production"
+
+healthCheck:
+  enabled: true
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 5173
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 5173
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# Init container to wait for API gateway
+initContainer:
+  enabled: true
+  image:
+    repository: busybox
+    tag: "1.35"
+  command:
+    - /bin/sh
+    - -c
+    - |
+      until nc -z api-gateway.gpu-telemetry.svc.cluster.local 8081; do
+        echo "Waiting for API gateway service..."
+        sleep 2
+      done
+      echo "API gateway service is ready!"
+
+# Autoscaling
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+labels:
+  app: gpu-telemetry
+  component: dashboard
+
+nodeSelector: {}
+tolerations: []
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - dashboard
+        topologyKey: kubernetes.io/hostname

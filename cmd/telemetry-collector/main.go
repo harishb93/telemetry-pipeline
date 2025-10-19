@@ -23,7 +23,8 @@ func main() {
 		maxEntriesPerGPU  = flag.Int("max-entries", 1000, "Maximum entries per GPU in memory storage")
 		checkpointEnabled = flag.Bool("checkpoint", true, "Enable checkpoint persistence")
 		checkpointDir     = flag.String("checkpoint-dir", "./checkpoints", "Directory for checkpoint files")
-		healthPort        = flag.String("health-port", "8080", "Port for health check server")
+		healthPort        = flag.String("health-port", "9090", "Port for health check server")
+		grpcPort          = flag.String("grpc-port", "9092", "Port for gRPC server")
 		mqServiceURL      = flag.String("mq-url", "http://localhost:9090", "URL of the MQ service")
 		mqTopic           = flag.String("mq-topic", "telemetry", "MQ topic to subscribe to")
 	)
@@ -37,6 +38,7 @@ func main() {
 		"checkpoint_enabled", *checkpointEnabled,
 		"checkpoint_dir", *checkpointDir,
 		"health_port", *healthPort,
+		"grpc_port", *grpcPort,
 		"mq_service_url", *mqServiceURL,
 		"mq_topic", *mqTopic)
 
@@ -45,11 +47,15 @@ func main() {
 	grpcAddr := *mqServiceURL
 	// Default to localhost if URL is not provided
 	if grpcAddr == "http://localhost:9090" {
-		grpcAddr = "localhost:9092"
+		grpcAddr = "localhost:" + *grpcPort
 	} else {
-		// Remove http:// prefix and use as gRPC address directly
+		// Remove http:// prefix
 		grpcAddr = strings.TrimPrefix(grpcAddr, "http://")
-		// The environment variable MQ_URL should be set to gRPC address for Docker
+		// Remove any existing port and replace with grpcPort
+		if idx := strings.LastIndex(grpcAddr, ":"); idx != -1 {
+			grpcAddr = grpcAddr[:idx]
+		}
+		grpcAddr = grpcAddr + ":" + *grpcPort
 	}
 
 	broker, err := mq.NewGRPCBrokerClient(grpcAddr)

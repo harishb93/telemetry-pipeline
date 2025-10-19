@@ -1,0 +1,17 @@
+apiVersion: v2
+name: api-gateway
+description: API Gateway for GPU Telemetry Pipeline
+type: application
+version: 0.1.0
+appVersion: "1.0"
+keywords:
+  - telemetry
+  - gpu
+  - api
+  - gateway
+maintainers:
+  - name: GPU Telemetry Team
+# dependencies:
+#   - name: telemetry-collector
+#     version: "0.1.0"
+#     condition: telemetry-collector.enabled

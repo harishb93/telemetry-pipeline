@@ -1,0 +1,85 @@
+# Default values for telemetry-streamer
+image:
+  repository: localhost:5000/telemetry-streamer
+  tag: latest
+  pullPolicy: IfNotPresent
+
+namespace: gpu-telemetry
+
+# ConfigMap with telemetry data
+configMap:
+  name: telemetry-data
+  mountPath: /app/data
+  fileName: telemetry.csv
+
+# Environment variables for hostname filtering
+env:
+  # Comma-separated list of hostnames to filter
+  # Leave empty to process all hostnames
+  - name: HOSTNAME_LIST
+    value: "mtv5-dgx1-hgpu-031,mtv5-dgx1-hgpu-022,mtv5-dgx1-hgpu-010"
+  - name: MQ_BROKER_URL
+    value: "tcp://mq-service:9091"
+  - name: CSV_FILE_PATH
+    value: "/app/data/telemetry.csv"
+  - name: LOG_LEVEL
+    value: "INFO"
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+healthCheck:
+  enabled: true
+  livenessProbe:
+    exec:
+      command:
+      - /bin/sh
+      - -c
+      - "pgrep -f telemetry-streamer"
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    exec:
+      command:
+      - /bin/sh
+      - -c
+      - "test -f /tmp/streamer-ready"
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# Service account for DaemonSet
+serviceAccount:
+  create: true
+  name: telemetry-streamer
+
+# Node selection
+nodeSelector:
+  # Run on GPU nodes if available
+  # node-role.kubernetes.io/gpu: "true"
+
+tolerations:
+  # Allow scheduling on GPU nodes with taints
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+
+affinity: {}
+
+# Update strategy for DaemonSet
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+
+labels:
+  app: gpu-telemetry
+  component: streamer

@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "telemetry-streamer.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "telemetry-streamer.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "telemetry-streamer.selectorLabels" . | nindent 6 }}
+  updateStrategy:
+    {{- toYaml .Values.updateStrategy | nindent 4 }}
+  template:
+    metadata:
+      labels:
+        {{- include "telemetry-streamer.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      containers:
+        - name: telemetry-streamer
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - "-csv-file=/app/data/telemetry.csv"
+            - "-broker-url=http://mq-service:9090"
+            - "-topic=telemetry"
+            - "-rate=10.0"
+            - "-workers=2"
+          env:
+            {{- toYaml .Values.env | nindent 12 }}
+            # Add node name as environment variable
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          volumeMounts:
+            - name: telemetry-data
+              mountPath: {{ .Values.configMap.mountPath }}
+              readOnly: true
+          {{- if .Values.healthCheck.enabled }}
+          livenessProbe:
+            {{- toYaml .Values.healthCheck.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.healthCheck.readinessProbe | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: telemetry-data
+          configMap:
+            name: {{ .Values.configMap.name }}
+            items:
+              - key: telemetry.csv
+                path: {{ .Values.configMap.fileName }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

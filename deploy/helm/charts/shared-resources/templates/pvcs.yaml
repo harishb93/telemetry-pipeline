@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.persistentVolumes.mqData.name }}
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app: {{ .Values.labels.app }}
+    component: mq
+spec:
+  accessModes:
+    - {{ .Values.persistentVolumes.mqData.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.persistentVolumes.mqData.size }}
+  {{- if .Values.persistentVolumes.mqData.storageClass }}
+  storageClassName: {{ .Values.persistentVolumes.mqData.storageClass }}
+  {{- end }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.persistentVolumes.collectorData.name }}
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app: {{ .Values.labels.app }}
+    component: collector
+spec:
+  accessModes:
+    - {{ .Values.persistentVolumes.collectorData.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.persistentVolumes.collectorData.size }}
+  {{- if .Values.persistentVolumes.collectorData.storageClass }}
+  storageClassName: {{ .Values.persistentVolumes.collectorData.storageClass }}
+  {{- end }}

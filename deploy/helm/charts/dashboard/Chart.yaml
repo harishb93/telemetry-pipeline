@@ -1,0 +1,18 @@
+apiVersion: v2
+name: dashboard
+description: React Dashboard for GPU Telemetry Pipeline
+type: application
+version: 0.1.0
+appVersion: "1.0"
+keywords:
+  - telemetry
+  - gpu
+  - dashboard
+  - react
+  - frontend
+maintainers:
+  - name: GPU Telemetry Team
+# dependencies:
+#   - name: api-gateway
+#     version: "0.1.0"
+#     condition: api-gateway.enabled

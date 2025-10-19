@@ -1,0 +1,58 @@
+{{/*
+GPU Telemetry Pipeline - Installation Notes
+*/}}
+🚀 GPU Telemetry Pipeline has been deployed!
+
+1. Check the deployment status:
+
+   # Backend components in {{ .Values.global.namespace }} namespace
+   kubectl get pods -n {{ .Values.global.namespace }}
+
+   # Dashboard (if enabled)
+   kubectl get pods -l app=dashboard
+
+2. Access the services:
+
+   # Port-forward to access dashboard (if deployed in default namespace)
+   kubectl port-forward svc/dashboard 3000:80
+
+   # Port-forward to access API gateway
+   kubectl --namespace {{ .Values.global.namespace }} port-forward svc/api-gateway 8081:80
+
+   Your services will be available at:
+   - Dashboard: http://localhost:3000
+   - API Gateway: http://localhost:8081
+
+3. Configuration:
+
+   - Namespace: {{ .Values.global.namespace }}
+   - Components enabled: 
+{{- if index .Values "shared-resources" "enabled" }}
+     ✓ Shared Resources
+{{- end }}
+{{- if index .Values "mq-service" "enabled" }}
+     ✓ Message Queue Service
+{{- end }}
+{{- if index .Values "telemetry-collector" "enabled" }}
+     ✓ Telemetry Collector
+{{- end }}
+{{- if index .Values "telemetry-streamer" "enabled" }}
+     ✓ Telemetry Streamer (DaemonSet)
+{{- end }}
+{{- if index .Values "api-gateway" "enabled" }}
+     ✓ API Gateway
+{{- end }}
+{{- if index .Values "dashboard" "enabled" }}
+     ✓ Dashboard
+{{- end }}
+
+4. Useful commands:
+
+   # View logs
+   kubectl logs -n {{ .Values.global.namespace }} -l app=telemetry-collector
+   kubectl logs -n {{ .Values.global.namespace }} -l app=telemetry-streamer
+
+   # Check persistent volumes
+   kubectl get pvc -n {{ .Values.global.namespace }}
+
+Thank you for using GPU Telemetry Pipeline! 🎯

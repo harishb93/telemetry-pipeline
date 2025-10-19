@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "mq-service.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "mq-service.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "mq-service.fullname" . }}
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "mq-service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "mq-service.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: mq-service
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: admin
+              containerPort: {{ .Values.service.ports.admin }}
+              protocol: TCP
+            - name: broker
+              containerPort: {{ .Values.service.ports.broker }}
+              protocol: TCP
+          env:
+            {{- toYaml .Values.env | nindent 12 }}
+          volumeMounts:
+            - name: mq-data
+              mountPath: {{ .Values.persistence.mountPath }}
+          {{- if .Values.healthCheck.enabled }}
+          livenessProbe:
+            {{- toYaml .Values.healthCheck.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.healthCheck.readinessProbe | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: mq-data
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

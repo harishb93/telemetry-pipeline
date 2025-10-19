@@ -1,450 +1,1177 @@
-# Telemetry Pipeline Helm Chart
+# GPU Telemetry Pipeline - Helm Charts# GPU Telemetry Pipeline - Helm Deployment Guide# Telemetry Pipeline Helm Chart
 
-This Helm chart deploys a complete GPU telemetry pipeline on Kubernetes, consisting of three main components:
 
-- **Telemetry Streamer**: DaemonSet that streams GPU telemetry data from CSV files
-- **Telemetry Collector**: Deployment that collects and processes telemetry data via message queue
-- **API Gateway**: Deployment that provides REST API access to telemetry data
 
-## Prerequisites
+This directory contains Helm charts for deploying the complete GPU Telemetry Pipeline to Kubernetes.
 
-- Kubernetes 1.16+
-- Helm 3.0+
-- Persistent Volume provisioner support in the underlying infrastructure (for data persistence)
 
-## Architecture
+
+## Chart StructureThis guide provides comprehensive instructions for deploying the GPU Telemetry Pipeline using Helm charts.This Helm chart deploys a complete GPU telemetry pipeline on Kubernetes, consisting of three main components:
+
+
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│  Streamer       │    │   Collector      │    │   API Gateway   │
-│  (DaemonSet)    │───▶│  (Deployment)    │───▶│  (Deployment)   │
-│                 │    │                  │    │                 │
-│ • CSV Data      │    │ • Message Queue  │    │ • REST API      │
-│ • Rate Control  │    │ • Persistence    │    │ • OpenAPI Spec  │
-│ • Multi-Node    │    │ • Health Checks  │    │ • Ingress       │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
+
+deploy/helm/
+
+├── telemetry-pipeline/          # Umbrella chart for complete stack## Overview- **Telemetry Streamer**: DaemonSet that streams GPU telemetry data from CSV files
+
+│   ├── Chart.yaml
+
+│   ├── values.yaml- **Telemetry Collector**: Deployment that collects and processes telemetry data via message queue
+
+│   └── templates/
+
+│       └── NOTES.txtThe GPU Telemetry Pipeline consists of the following components:- **API Gateway**: Deployment that provides REST API access to telemetry data
+
+└── charts/                      # Individual component charts
+
+    ├── shared-resources/        # Namespace, ConfigMaps, PVCs
+
+    ├── mq-service/             # Message Queue (StatefulSet)
+
+    ├── telemetry-collector/    # Data Collector (StatefulSet)1. **Shared Resources** - Namespace, ConfigMaps, and PVCs## Prerequisites
+
+    ├── telemetry-streamer/     # Data Streamer (DaemonSet)
+
+    ├── api-gateway/            # API Gateway (Deployment)2. **MQ Service** - Message queue (StatefulSet with persistent storage)
+
+    └── dashboard/              # Web Dashboard (Deployment)
+
+```3. **Telemetry Collector** - Data collector (StatefulSet with persistent storage)- Kubernetes 1.16+
+
+
+
+## Quick Start4. **Telemetry Streamer** - CSV data streamer (DaemonSet)- Helm 3.0+
+
+
+
+### Deploy Complete Stack5. **API Gateway** - REST API service (Deployment with autoscaling)- Persistent Volume provisioner support in the underlying infrastructure (for data persistence)
+
+
+
+```bash6. **Dashboard** - React frontend (Deployment with Ingress)
+
+# Navigate to helm directory
+
+cd deploy/helm## Architecture
+
+
+
+# Install the complete pipeline## Architecture
+
+helm install gpu-telemetry telemetry-pipeline/
+
 ```
 
-## Installation
+# Or with custom values
 
-### Quick Start
+helm install gpu-telemetry telemetry-pipeline/ \```┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 
-```bash
-# Add the repository (if available)
-helm repo add telemetry-pipeline https://charts.example.com/telemetry-pipeline
-helm repo update
+  --set global.namespace=my-telemetry \
 
-# Install with default values
-helm install my-telemetry-pipeline telemetry-pipeline/telemetry-pipeline
+  --set dashboard.ingress.enabled=true \┌─────────────────────────────────────────────────────────────────┐│  Streamer       │    │   Collector      │    │   API Gateway   │
 
-# Or install from local directory
-helm install my-telemetry-pipeline ./deploy/helm/telemetry-pipeline
+  --set dashboard.ingress.hosts[0].host=telemetry.mydomain.com
+
+```│                          Kubernetes Cluster                     ││  (DaemonSet)    │───▶│  (Deployment)    │───▶│  (Deployment)   │
+
+
+
+### Deploy Individual Components├─────────────────────────────────────────────────────────────────┤│                 │    │                  │    │                 │
+
+
+
+```bash│  Default Namespace                 │  gpu-telemetry Namespace    ││ • CSV Data      │    │ • Message Queue  │    │ • REST API      │
+
+# Deploy only shared resources (namespace, PVCs, ConfigMaps)
+
+helm install shared-resources charts/shared-resources/│  ┌─────────────────┐              │  ┌─────────────────────────┐ ││ • Rate Control  │    │ • Persistence    │    │ • OpenAPI Spec  │
+
+
+
+# Deploy message queue│  │   Dashboard     │◄─────────────┼──┤      API Gateway       │ ││ • Multi-Node    │    │ • Health Checks  │    │ • Ingress       │
+
+helm install mq-service charts/mq-service/ \
+
+  --dependency-update│  │  (Deployment)   │              │  │     (Deployment)       │ │└─────────────────┘    └──────────────────┘    └─────────────────┘
+
+
+
+# Deploy collector│  │   + Ingress     │              │  │    + Autoscaling       │ │```
+
+helm install telemetry-collector charts/telemetry-collector/ \
+
+  --dependency-update│  └─────────────────┘              │  └─────────────────────────┘ │
+
+
+
+# Deploy streamer│           │                       │              │               │## Installation
+
+helm install telemetry-streamer charts/telemetry-streamer/ \
+
+  --dependency-update│           └───────────────────────┼──────────────┘               │
+
+
+
+# Deploy API gateway│                                   │                              │### Quick Start
+
+helm install api-gateway charts/api-gateway/
+
+│                                   │  ┌─────────────────────────┐ │
+
+# Deploy dashboard
+
+helm install dashboard charts/dashboard/│                                   │  │  Telemetry Collector    │ │```bash
+
 ```
 
-### Custom Installation
+│                                   │  │    (StatefulSet)        │ │# Add the repository (if available)
 
-```bash
-# Install with custom values
-helm install my-telemetry-pipeline ./deploy/helm/telemetry-pipeline \
-  --set apiGateway.ingress.enabled=true \
-  --set apiGateway.ingress.hosts[0].host=telemetry-api.example.com \
-  --set collector.persistence.size=50Gi \
-  --set streamer.workers=4
+## Production Deployment
+
+│                                   │  │      + PVC              │ │helm repo add telemetry-pipeline https://charts.example.com/telemetry-pipeline
+
+### Prerequisites
+
+│                                   │  └─────────────────────────┘ │helm repo update
+
+1. **Kubernetes cluster** (v1.20+)
+
+2. **Helm** (v3.0+)│                                   │              │               │
+
+3. **Storage class** for persistent volumes
+
+4. **Ingress controller** (if using ingress)│                                   │  ┌─────────────────────────┐ │# Install with default values
+
+
+
+### Production Example│                                   │  │     MQ Service          │ │helm install my-telemetry-pipeline telemetry-pipeline/telemetry-pipeline
+
+
+
+```bash│                                   │  │    (StatefulSet)        │ │
+
+# Deploy with production settings
+
+helm install gpu-telemetry telemetry-pipeline/ \│                                   │  │      + PVC              │ │# Or install from local directory
+
+  --set global.namespace=gpu-telemetry-prod \
+
+  --set global.storageClass=fast-ssd \│                                   │  └─────────────────────────┘ │helm install my-telemetry-pipeline ./deploy/helm/telemetry-pipeline
+
+  --set dashboard.ingress.enabled=true \
+
+  --set dashboard.ingress.hosts[0].host=telemetry.company.com \│                                   │              ▲               │```
+
+  --namespace gpu-telemetry-prod \
+
+  --create-namespace│  ┌─────────────────────────────────┼──────────────┘               │
+
 ```
 
-### Production Installation
+│  │          Every Node             │                              │### Custom Installation
 
-```bash
-# Create a production values file
-cat > production-values.yaml <<EOF
-# Production configuration
-collector:
-  replicaCount: 3
-  persistence:
-    enabled: true
-    size: 100Gi
-    storageClass: fast-ssd
-  resources:
-    requests:
-      cpu: 500m
-      memory: 1Gi
-    limits:
-      cpu: 1000m
-      memory: 2Gi
-  autoscaling:
-    enabled: true
-    minReplicas: 2
-    maxReplicas: 5
-    targetCPUUtilizationPercentage: 70
+## Component Overview
 
-apiGateway:
-  replicaCount: 3
-  ingress:
-    enabled: true
-    className: nginx
-    annotations:
-      cert-manager.io/cluster-issuer: letsencrypt-prod
-      nginx.ingress.kubernetes.io/rate-limit: "100"
-    hosts:
-      - host: telemetry-api.production.com
-        paths:
-          - path: /
-            pathType: Prefix
-    tls:
-      - secretName: telemetry-api-tls
-        hosts:
-          - telemetry-api.production.com
-  autoscaling:
-    enabled: true
-    minReplicas: 3
-    maxReplicas: 10
+│  │  ┌─────────────────────────┐    │  ┌─────────────────────────┐ │
 
-mq:
-  persistence:
-    enabled: true
-    size: 20Gi
-    storageClass: fast-ssd
+### 1. Shared Resources
 
-monitoring:
-  serviceMonitor:
-    enabled: true
-    labels:
-      release: prometheus
-EOF
+- **Type**: Job (creates resources)│  │  │  Telemetry Streamer     │────┼──┤     ConfigMap           │ │```bash
 
-helm install telemetry-production ./deploy/helm/telemetry-pipeline \
-  -f production-values.yaml
-```
+- **Purpose**: Sets up namespace, ConfigMaps, and PersistentVolumeClaims
+
+- **Dependencies**: None│  │  │    (DaemonSet)          │    │  │   (telemetry.csv)       │ │# Install with custom values
+
+
+
+### 2. Message Queue Service│  │  │  + CSV ConfigMap        │    │  │                         │ │helm install my-telemetry-pipeline ./deploy/helm/telemetry-pipeline \
+
+- **Type**: StatefulSet
+
+- **Purpose**: Provides message queuing for telemetry data│  │  └─────────────────────────┘    │  └─────────────────────────┘ │  --set apiGateway.ingress.enabled=true \
+
+- **Dependencies**: Shared Resources
+
+- **Persistence**: Yes (5Gi default)│  └─────────────────────────────────┼──────────────────────────────┤  --set apiGateway.ingress.hosts[0].host=telemetry-api.example.com \
+
+
+
+### 3. Telemetry Collector└─────────────────────────────────────────────────────────────────┘  --set collector.persistence.size=50Gi \
+
+- **Type**: StatefulSet
+
+- **Purpose**: Collects and processes telemetry data```  --set streamer.workers=4
+
+- **Dependencies**: Message Queue Service
+
+- **Persistence**: Yes (10Gi default)```
+
+
+
+### 4. Telemetry Streamer## Prerequisites
+
+- **Type**: DaemonSet
+
+- **Purpose**: Streams GPU telemetry data from nodes### Production Installation
+
+- **Dependencies**: Shared Resources (for ConfigMap)
+
+- **Hostname Filtering**: Supports HOSTNAME_LIST environment variable- Kubernetes cluster (v1.19+)
+
+
+
+### 5. API Gateway- Helm 3.0+```bash
+
+- **Type**: Deployment with autoscaling
+
+- **Purpose**: Provides REST API access to telemetry data- Ingress controller (nginx recommended)# Create a production values file
+
+- **Dependencies**: Telemetry Collector
+
+- **Replicas**: 2 default, autoscales 2-10- Storage class for persistent volumescat > production-values.yaml <<EOF
+
+
+
+### 6. Dashboard# Production configuration
+
+- **Type**: Deployment with autoscaling
+
+- **Purpose**: Web-based dashboard for telemetry visualization## Quick Startcollector:
+
+- **Dependencies**: API Gateway
+
+- **Ingress**: Optional, enabled via values  replicaCount: 3
+
+- **Namespace**: Deploys to default namespace by default
+
+### 1. Deploy Complete Stack  persistence:
 
 ## Configuration
 
-### Component Configuration
+    enabled: true
 
-#### Telemetry Streamer (DaemonSet)
+### Global Settings
 
-The streamer runs as a DaemonSet to collect telemetry data from each node:
+```bash    size: 100Gi
 
 ```yaml
-streamer:
-  enabled: true
-  workers: 2                    # Workers per node
-  rate: 10.0                   # Messages per second per worker
-  
-  # CSV data configuration
-  csvData: |                   # Inline CSV data
-    gpu_id,utilization,temperature,memory_used
-    gpu-001,85.5,72.3,4096
-    # ... more data
-  
-  # Alternative: Use ConfigMap or PVC for large CSV files
-  persistence:
-    enabled: true              # Enable persistent storage
-    size: 5Gi                 # Storage size for CSV files
-  
-  # Resource limits
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 200m
-      memory: 256Mi
+
+global:# Navigate to the Helm directory    storageClass: fast-ssd
+
+  namespace: gpu-telemetry
+
+  imageRegistry: ""cd deploy/helm  resources:
+
+  imagePullSecrets: []
+
+  storageClass: ""    requests:
+
 ```
 
-**CSV Data Options:**
+# Install the complete telemetry pipeline      cpu: 500m
+
+### Enable/Disable Components
+
+helm install gpu-telemetry telemetry-pipeline/      memory: 1Gi
+
+```yaml
+
+shared-resources:    limits:
+
+  enabled: true
+
+mq-service:# Or with custom values      cpu: 1000m
+
+  enabled: true
+
+telemetry-collector:helm install gpu-telemetry telemetry-pipeline/ -f custom-values.yaml      memory: 2Gi
+
+  enabled: true
+
+telemetry-streamer:```  autoscaling:
+
+  enabled: true
+
+api-gateway:    enabled: true
+
+  enabled: true
+
+dashboard:### 2. Verify Deployment    minReplicas: 2
+
+  enabled: true
+
+```    maxReplicas: 5
+
+
+
+## Accessing Services```bash    targetCPUUtilizationPercentage: 70
+
+
+
+### Development (Port Forward)# Check all resources
+
+
+
+```bashkubectl get all -n gpu-telemetryapiGateway:
+
+# Dashboard
+
+kubectl port-forward svc/dashboard 3000:80kubectl get all -n default -l app=gpu-telemetry  replicaCount: 3
+
+
+
+# API Gateway  ingress:
+
+kubectl -n gpu-telemetry port-forward svc/api-gateway 8081:80
+
+# Check persistent volumes    enabled: true
+
+# Health check
+
+kubectl -n gpu-telemetry port-forward svc/telemetry-collector 8080:8080kubectl get pvc -n gpu-telemetry    className: nginx
+
+curl http://localhost:8080/health
+
+```    annotations:
+
+
+
+### Production (Ingress)# Check ingress      cert-manager.io/cluster-issuer: letsencrypt-prod
+
+
+
+Configure ingress for external access:kubectl get ingress -n default      nginx.ingress.kubernetes.io/rate-limit: "100"
+
+
+
+```yaml```    hosts:
+
+dashboard:
+
+  ingress:      - host: telemetry-api.production.com
+
+    enabled: true
+
+    className: "nginx"### 3. Access Dashboard        paths:
+
+    hosts:
+
+      - host: telemetry.company.com          - path: /
+
+        paths:
+
+          - path: /```bash            pathType: Prefix
+
+            pathType: Prefix
+
+```# If using ingress (recommended)    tls:
+
+
+
+## Monitoring# Add to /etc/hosts: <ingress-ip> gpu-telemetry.local      - secretName: telemetry-api-tls
+
+
+
+### Check Status# Then visit: http://gpu-telemetry.local        hosts:
+
+
+
+```bash          - telemetry-api.production.com
+
+# All components
+
+kubectl get all -n gpu-telemetry# Or port forward  autoscaling:
+
+
+
+# Persistent volumeskubectl port-forward -n default svc/dashboard 8080:5173    enabled: true
+
+kubectl get pvc -n gpu-telemetry
+
+# Visit: http://localhost:8080    minReplicas: 3
+
+# DaemonSet status
+
+kubectl get ds telemetry-streamer -n gpu-telemetry```    maxReplicas: 10
+
+```
+
+
+
+### View Logs
+
+## Component-Specific Deploymentmq:
+
+```bash
+
+# Streamer (runs on all nodes)  persistence:
+
+kubectl logs -n gpu-telemetry -l app=telemetry-streamer
+
+### Deploy Individual Components    enabled: true
+
+# Collector
+
+kubectl logs -n gpu-telemetry -l app=telemetry-collector    size: 20Gi
+
+
+
+# API GatewayYou can deploy components separately for testing or specific use cases:    storageClass: fast-ssd
+
+kubectl logs -n gpu-telemetry -l app=api-gateway
+
+```
+
+
+
+## Troubleshooting```bashmonitoring:
+
+
+
+### Common Issues# 1. Deploy shared resources first (required)  serviceMonitor:
+
+
+
+1. **Persistent Volume Claims Pending**helm install shared-resources charts/shared-resources/    enabled: true
+
+   - Check if storage class exists: `kubectl get storageclass`
+
+   - Verify cluster has available storage    labels:
+
+
+
+2. **Pods in CrashLoopBackOff**# 2. Deploy MQ service      release: prometheus
+
+   - Check logs: `kubectl logs <pod-name> -n gpu-telemetry`
+
+   - Verify dependencies are runninghelm install mq-service charts/mq-service/EOF
+
+
+
+3. **DaemonSet Not Scheduling**
+
+   - Check node selectors and tolerations
+
+   - Verify nodes have required labels# 3. Deploy collector (depends on MQ)helm install telemetry-production ./deploy/helm/telemetry-pipeline \
+
+
+
+4. **Ingress Not Working**helm install telemetry-collector charts/telemetry-collector/  -f production-values.yaml
+
+   - Verify ingress controller is installed
+
+   - Check ingress configuration: `kubectl get ingress````
+
+
+
+### Validation Commands# 4. Deploy streamer (DaemonSet)
+
+
+
+```bashhelm install telemetry-streamer charts/telemetry-streamer/## Configuration
+
+# Lint charts
+
+helm lint telemetry-pipeline/
+
+helm lint charts/*/
+
+# 5. Deploy API gateway (depends on collector)### Component Configuration
+
+# Dry run
+
+helm install test telemetry-pipeline/ --dry-runhelm install api-gateway charts/api-gateway/
+
+
+
+# Template output#### Telemetry Streamer (DaemonSet)
+
+helm template telemetry-pipeline/ > output.yaml
+
+```# 6. Deploy dashboard (depends on API gateway)
+
+
+
+## Upgradeshelm install dashboard charts/dashboard/The streamer runs as a DaemonSet to collect telemetry data from each node:
+
+
+
+```bash```
+
+# Upgrade complete stack
+
+helm upgrade gpu-telemetry telemetry-pipeline/```yaml
+
+
+
+# Upgrade with new values## Configuration Optionsstreamer:
+
+helm upgrade gpu-telemetry telemetry-pipeline/ \
+
+  --set telemetry-streamer.image.tag=v2.0.0  enabled: true
+
+```
+
+### Environment Variables  workers: 2                    # Workers per node
+
+## Uninstalling
+
+  rate: 10.0                   # Messages per second per worker
+
+```bash
+
+# Remove applicationThe telemetry streamer supports hostname filtering:  
+
+helm uninstall gpu-telemetry
+
+  # CSV data configuration
+
+# Clean up namespace (if desired)
+
+kubectl delete namespace gpu-telemetry```yaml  csvData: |                   # Inline CSV data
+
+```
+
+telemetry-streamer:    gpu_id,utilization,temperature,memory_used
+
+## Support
+
+  env:    gpu-001,85.5,72.3,4096
+
+This Helm chart provides a production-ready deployment of the GPU Telemetry Pipeline with:
+
+    - name: HOSTNAME_LIST    # ... more data
+
+- ✅ High availability configurations
+
+- ✅ Persistent storage for stateful components      value: "host1,host2,host3"  # Comma-separated list  
+
+- ✅ Autoscaling for stateless components
+
+- ✅ Proper dependency management    # Leave empty to process all hostnames  # Alternative: Use ConfigMap or PVC for large CSV files
+
+- ✅ Security contexts and constraints
+
+- ✅ Health checks and monitoring```  persistence:
+
+- ✅ Ingress configuration for external access
+
+- ✅ Namespace isolation    enabled: true              # Enable persistent storage
+
+- ✅ ConfigMap-based configuration
+### Resource Limits    size: 5Gi                 # Storage size for CSV files
+
+  
+
+Adjust resource limits based on your cluster capacity:  # Resource limits
+
+  resources:
+
+```yaml    requests:
+
+# Example custom values      cpu: 100m
+
+mq-service:      memory: 128Mi
+
+  resources:    limits:
+
+    limits:      cpu: 200m
+
+      cpu: 1000m      memory: 256Mi
+
+      memory: 1Gi```
+
+    requests:
+
+      cpu: 500m**CSV Data Options:**
+
+      memory: 512Mi
 
 1. **Inline CSV** (default): Small datasets defined directly in values.yaml
-2. **ConfigMap**: For medium datasets, create a ConfigMap:
-   ```bash
-   kubectl create configmap telemetry-csv --from-file=telemetry.csv
-   ```
-3. **Persistent Volume**: For large datasets, enable persistence and mount CSV files
+
+telemetry-collector:2. **ConfigMap**: For medium datasets, create a ConfigMap:
+
+  resources:   ```bash
+
+    limits:   kubectl create configmap telemetry-csv --from-file=telemetry.csv
+
+      cpu: 2000m   ```
+
+      memory: 2Gi3. **Persistent Volume**: For large datasets, enable persistence and mount CSV files
+
+```
 
 #### Telemetry Collector (Deployment)
 
+### Storage Configuration
+
 The collector processes telemetry data and provides message queue functionality:
 
+Configure persistent storage:
+
 ```yaml
-collector:
-  enabled: true
-  replicaCount: 1
-  workers: 4                   # Processing workers
-  maxEntriesPerGPU: 10000     # Max entries per GPU in storage
-  checkpointEnabled: true      # Enable checkpointing
-  
-  # Persistence for collected data
-  persistence:
-    enabled: true
+
+```yamlcollector:
+
+shared-resources:  enabled: true
+
+  persistentVolumes:  replicaCount: 1
+
+    mqData:  workers: 4                   # Processing workers
+
+      size: 20Gi  maxEntriesPerGPU: 10000     # Max entries per GPU in storage
+
+      storageClass: "fast-ssd"  checkpointEnabled: true      # Enable checkpointing
+
+    collectorData:  
+
+      size: 50Gi  # Persistence for collected data
+
+      storageClass: "fast-ssd"  persistence:
+
+```    enabled: true
+
     size: 10Gi
-    storageClass: "fast-ssd"
+
+### Ingress Configuration    storageClass: "fast-ssd"
+
   
-  # Message Queue persistence
+
+Configure external access:  # Message Queue persistence
+
 mq:
-  persistence:
-    enabled: true
-    size: 5Gi
-    dir: "/var/lib/mq"
-  
-  # Autoscaling
-  autoscaling:
-    enabled: true
-    minReplicas: 1
-    maxReplicas: 3
-    targetCPUUtilizationPercentage: 80
-```
 
-#### API Gateway (Deployment)
+```yaml  persistence:
 
-The API gateway provides REST API access to telemetry data:
+dashboard:    enabled: true
 
-```yaml
-apiGateway:
-  enabled: true
-  replicaCount: 2
-  port: 8081
-  
-  # CORS configuration
-  cors:
-    enabled: true
-    allowedOrigins: ["*"]
-    allowedMethods: ["GET", "POST", "OPTIONS"]
-  
-  # Ingress configuration
-  ingress:
-    enabled: true
-    className: "nginx"
-    annotations:
-      cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    hosts:
-      - host: telemetry-api.example.com
-        paths:
-          - path: /
-            pathType: Prefix
+  ingress:    size: 5Gi
+
+    enabled: true    dir: "/var/lib/mq"
+
+    className: "nginx"  
+
+    annotations:  # Autoscaling
+
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"  autoscaling:
+
+    hosts:    enabled: true
+
+      - host: gpu-telemetry.example.com    minReplicas: 1
+
+        paths:    maxReplicas: 3
+
+          - path: /    targetCPUUtilizationPercentage: 80
+
+            pathType: Prefix```
+
     tls:
-      - secretName: telemetry-api-tls
+
+      - secretName: gpu-telemetry-tls#### API Gateway (Deployment)
+
         hosts:
-          - telemetry-api.example.com
+
+          - gpu-telemetry.example.comThe API gateway provides REST API access to telemetry data:
+
 ```
 
-### Resource Configuration
-
-Configure resource requests and limits for optimal performance:
-
 ```yaml
-# Streamer resources (per DaemonSet pod)
-streamer:
-  resources:
-    requests:
-      cpu: 100m      # Low CPU for data streaming
-      memory: 128Mi
-    limits:
-      cpu: 200m
-      memory: 256Mi
 
-# Collector resources (data processing intensive)
-collector:
+## Scaling and High AvailabilityapiGateway:
+
+  enabled: true
+
+### Enable Autoscaling  replicaCount: 2
+
+  port: 8081
+
+```yaml  
+
+api-gateway:  # CORS configuration
+
+  autoscaling:  cors:
+
+    enabled: true    enabled: true
+
+    minReplicas: 2    allowedOrigins: ["*"]
+
+    maxReplicas: 10    allowedMethods: ["GET", "POST", "OPTIONS"]
+
+    targetCPUUtilizationPercentage: 80  
+
+  # Ingress configuration
+
+dashboard:  ingress:
+
+  autoscaling:    enabled: true
+
+    enabled: true    className: "nginx"
+
+    minReplicas: 2    annotations:
+
+    maxReplicas: 5      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+
+    targetCPUUtilizationPercentage: 80    hosts:
+
+```      - host: telemetry-api.example.com
+
+        paths:
+
+### Multi-Node Deployment          - path: /
+
+            pathType: Prefix
+
+The DaemonSet automatically deploys streamers to all nodes. Configure node selection:    tls:
+
+      - secretName: telemetry-api-tls
+
+```yaml        hosts:
+
+telemetry-streamer:          - telemetry-api.example.com
+
+  nodeSelector:```
+
+    node-role.kubernetes.io/gpu: "true"
+
+  tolerations:### Resource Configuration
+
+    - key: nvidia.com/gpu
+
+      operator: ExistsConfigure resource requests and limits for optimal performance:
+
+      effect: NoSchedule
+
+``````yaml
+
+# Streamer resources (per DaemonSet pod)
+
+## Monitoring and Troubleshootingstreamer:
+
   resources:
-    requests:
-      cpu: 250m      # Higher CPU for data processing
-      memory: 512Mi
+
+### Health Checks    requests:
+
+      cpu: 100m      # Low CPU for data streaming
+
+All components include health checks:      memory: 128Mi
+
     limits:
-      cpu: 500m
+
+```bash      cpu: 200m
+
+# Check component health via API      memory: 256Mi
+
+kubectl port-forward -n gpu-telemetry svc/mq-service 9090:9090
+
+curl http://localhost:9090/health# Collector resources (data processing intensive)
+
+collector:
+
+kubectl port-forward -n gpu-telemetry svc/telemetry-collector 8080:8080  resources:
+
+curl http://localhost:8080/healthz    requests:
+
+      cpu: 250m      # Higher CPU for data processing
+
+kubectl port-forward -n gpu-telemetry svc/api-gateway 8081:8081      memory: 512Mi
+
+curl http://localhost:8081/health    limits:
+
+```      cpu: 500m
+
       memory: 1Gi
 
-# API Gateway resources (web server)
-apiGateway:
-  resources:
-    requests:
-      cpu: 150m      # Moderate CPU for API serving
-      memory: 256Mi
-    limits:
-      cpu: 300m
-      memory: 512Mi
-```
+### View Logs
 
-### Persistence Configuration
+# API Gateway resources (web server)
+
+```bashapiGateway:
+
+# MQ Service logs  resources:
+
+kubectl logs -n gpu-telemetry -l component=mq -f    requests:
+
+      cpu: 150m      # Moderate CPU for API serving
+
+# Collector logs      memory: 256Mi
+
+kubectl logs -n gpu-telemetry -l component=collector -f    limits:
+
+      cpu: 300m
+
+# Streamer logs (DaemonSet - multiple pods)      memory: 512Mi
+
+kubectl logs -n gpu-telemetry -l component=streamer -f```
+
+
+
+# API Gateway logs### Persistence Configuration
+
+kubectl logs -n gpu-telemetry -l component=api-gateway -f
 
 Configure storage for different components:
 
-```yaml
-# Collector data persistence
+# Dashboard logs
+
+kubectl logs -n default -l component=dashboard -f```yaml
+
+```# Collector data persistence
+
 collector:
-  persistence:
+
+### Debug Common Issues  persistence:
+
     enabled: true
-    size: 50Gi                    # Size based on data retention needs
-    storageClass: "fast-ssd"      # Use fast storage for better performance
-    accessModes:
-      - ReadWriteOnce
+
+#### 1. Pods stuck in Pending    size: 50Gi                    # Size based on data retention needs
+
+```bash    storageClass: "fast-ssd"      # Use fast storage for better performance
+
+kubectl describe pod <pod-name> -n gpu-telemetry    accessModes:
+
+# Check for resource constraints or node selector issues      - ReadWriteOnce
+
+```
 
 # Message Queue persistence
-mq:
-  persistence:
-    enabled: true
-    size: 10Gi                    # Size based on message volume
-    storageClass: "standard"      # Standard storage is sufficient
-    dir: "/var/lib/mq"
 
-# Streamer persistence (optional, for large CSV files)
-streamer:
-  persistence:
-    enabled: false                # Usually not needed for CSV streaming
-    size: 5Gi
-```
+#### 2. PVC not bindingmq:
 
-### Security Configuration
+```bash  persistence:
 
-Configure security contexts and network policies:
+kubectl get pvc -n gpu-telemetry    enabled: true
 
-```yaml
-# Pod security contexts
-collector:
+kubectl describe pvc <pvc-name> -n gpu-telemetry    size: 10Gi                    # Size based on message volume
+
+# Check storage class and available storage    storageClass: "standard"      # Standard storage is sufficient
+
+```    dir: "/var/lib/mq"
+
+
+
+#### 3. Service dependencies# Streamer persistence (optional, for large CSV files)
+
+```bashstreamer:
+
+# Check service discovery  persistence:
+
+kubectl get svc -n gpu-telemetry    enabled: false                # Usually not needed for CSV streaming
+
+kubectl get endpoints -n gpu-telemetry    size: 5Gi
+
+``````
+
+
+
+## Upgrade and Maintenance### Security Configuration
+
+
+
+### Upgrade DeploymentConfigure security contexts and network policies:
+
+
+
+```bash```yaml
+
+# Upgrade with new values# Pod security contexts
+
+helm upgrade gpu-telemetry telemetry-pipeline/ -f new-values.yamlcollector:
+
   podSecurityContext:
-    fsGroup: 2000
-    runAsNonRoot: true
-  securityContext:
+
+# Upgrade individual components    fsGroup: 2000
+
+helm upgrade telemetry-collector charts/telemetry-collector/    runAsNonRoot: true
+
+```  securityContext:
+
     runAsUser: 1000
-    readOnlyRootFilesystem: true
+
+### Backup and Recovery    readOnlyRootFilesystem: true
+
     capabilities:
-      drop:
-        - ALL
 
-# Network policies (optional)
-networkPolicy:
+```bash      drop:
+
+# Backup persistent data        - ALL
+
+kubectl exec -n gpu-telemetry mq-service-0 -- tar czf - /var/lib/mq > mq-backup.tar.gz
+
+kubectl exec -n gpu-telemetry telemetry-collector-0 -- tar czf - /app/data > collector-backup.tar.gz# Network policies (optional)
+
+```networkPolicy:
+
   enabled: true
-  policyTypes:
+
+### Cleanup  policyTypes:
+
     - Ingress
-    - Egress
-  ingress:
-    - from:
+
+```bash    - Egress
+
+# Uninstall complete stack  ingress:
+
+helm uninstall gpu-telemetry    - from:
+
       - podSelector:
-          matchLabels:
-            app.kubernetes.io/name: telemetry-pipeline
+
+# Clean up PVCs (if needed)          matchLabels:
+
+kubectl delete pvc -n gpu-telemetry --all            app.kubernetes.io/name: telemetry-pipeline
+
       ports:
-      - protocol: TCP
-        port: 8080
-```
 
-## Usage Examples
+# Clean up namespace      - protocol: TCP
 
-### 1. Installing Telemetry Streamer Only
+kubectl delete namespace gpu-telemetry        port: 8080
 
-```bash
-helm install telemetry-streamer ./deploy/helm/telemetry-pipeline \
-  --set collector.enabled=false \
-  --set apiGateway.enabled=false \
-  --set streamer.workers=4 \
-  --set streamer.rate=20.0
+``````
+
+
+
+## Custom CSV Data## Usage Examples
+
+
+
+To use your own telemetry data, update the ConfigMap:### 1. Installing Telemetry Streamer Only
+
+
+
+```yaml```bash
+
+shared-resources:helm install telemetry-streamer ./deploy/helm/telemetry-pipeline \
+
+  configMaps:  --set collector.enabled=false \
+
+    telemetryData:  --set apiGateway.enabled=false \
+
+      data: |  --set streamer.workers=4 \
+
+        timestamp,metric_name,gpu_id,device,uuid,modelName,Hostname,container,pod,namespace,value,labels_raw  --set streamer.rate=20.0
+
+        # Your CSV data here...```
+
 ```
 
 ### 2. Installing Collector with High Availability
 
+Or create a separate ConfigMap and update the streamer configuration.
+
 ```bash
-helm install telemetry-collector ./deploy/helm/telemetry-pipeline \
+
+## Deployment Exampleshelm install telemetry-collector ./deploy/helm/telemetry-pipeline \
+
   --set streamer.enabled=false \
-  --set apiGateway.enabled=false \
+
+### Production Deployment with Custom Domain  --set apiGateway.enabled=false \
+
   --set collector.replicaCount=3 \
-  --set collector.autoscaling.enabled=true \
-  --set collector.persistence.size=100Gi
-```
 
-### 3. Installing API Gateway with Ingress
+```bash  --set collector.autoscaling.enabled=true \
+
+# Create custom values file  --set collector.persistence.size=100Gi
+
+cat > production-values.yaml << EOF```
+
+dashboard:
+
+  ingress:### 3. Installing API Gateway with Ingress
+
+    enabled: true
+
+    className: "nginx"```bash
+
+    annotations:helm install telemetry-api ./deploy/helm/telemetry-pipeline \
+
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"  --set streamer.enabled=false \
+
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"  --set collector.enabled=false \
+
+    hosts:  --set apiGateway.ingress.enabled=true \
+
+      - host: gpu-telemetry.company.com  --set apiGateway.ingress.hosts[0].host=api.telemetry.local
+
+        paths:```
+
+          - path: /
+
+            pathType: Prefix### 4. Custom CSV Data Configuration
+
+    tls:
+
+      - secretName: gpu-telemetry-tls```bash
+
+        hosts:# Create a ConfigMap with your CSV data
+
+          - gpu-telemetry.company.comkubectl create configmap my-telemetry-csv --from-file=my-data.csv
+
+
+
+shared-resources:# Install with custom ConfigMap
+
+  persistentVolumes:helm install my-telemetry ./deploy/helm/telemetry-pipeline \
+
+    mqData:  --set streamer.csvData="" \  # Disable inline CSV
+
+      size: 50Gi  --set-file streamer.csvData=my-data.csv
+
+      storageClass: "fast-ssd"```
+
+    collectorData:
+
+      size: 100Gi### 5. Development Setup
+
+      storageClass: "fast-ssd"
 
 ```bash
-helm install telemetry-api ./deploy/helm/telemetry-pipeline \
-  --set streamer.enabled=false \
-  --set collector.enabled=false \
-  --set apiGateway.ingress.enabled=true \
-  --set apiGateway.ingress.hosts[0].host=api.telemetry.local
-```
 
-### 4. Custom CSV Data Configuration
+api-gateway:# Minimal resources for development
 
-```bash
-# Create a ConfigMap with your CSV data
-kubectl create configmap my-telemetry-csv --from-file=my-data.csv
+  autoscaling:helm install telemetry-dev ./deploy/helm/telemetry-pipeline \
 
-# Install with custom ConfigMap
-helm install my-telemetry ./deploy/helm/telemetry-pipeline \
-  --set streamer.csvData="" \  # Disable inline CSV
-  --set-file streamer.csvData=my-data.csv
-```
+    enabled: true  --set collector.persistence.enabled=false \
 
-### 5. Development Setup
+    minReplicas: 3  --set mq.persistence.enabled=false \
 
-```bash
-# Minimal resources for development
-helm install telemetry-dev ./deploy/helm/telemetry-pipeline \
-  --set collector.persistence.enabled=false \
-  --set mq.persistence.enabled=false \
-  --set apiGateway.replicaCount=1 \
-  --set collector.replicaCount=1 \
+    maxReplicas: 20  --set apiGateway.replicaCount=1 \
+
+EOF  --set collector.replicaCount=1 \
+
   --set-string collector.resources.requests.cpu=50m \
-  --set-string collector.resources.requests.memory=128Mi
+
+# Deploy with production values  --set-string collector.resources.requests.memory=128Mi
+
+helm install gpu-telemetry telemetry-pipeline/ -f production-values.yaml```
+
 ```
 
 ## Monitoring
 
+### Development Deployment with Minimal Resources
+
 ### Prometheus Integration
 
-Enable Prometheus monitoring:
+```bash
 
-```yaml
-monitoring:
-  serviceMonitor:
-    enabled: true
-    interval: 30s
-    labels:
-      release: prometheus  # Match your Prometheus operator label selector
-```
+# Create development values fileEnable Prometheus monitoring:
 
-### Grafana Dashboard
+cat > dev-values.yaml << EOF
 
-Deploy with Grafana dashboard:
+mq-service:```yaml
 
-```yaml
-monitoring:
-  grafana:
-    enabled: true
+  resources:monitoring:
+
+    limits:  serviceMonitor:
+
+      cpu: 100m    enabled: true
+
+      memory: 128Mi    interval: 30s
+
+    requests:    labels:
+
+      cpu: 50m      release: prometheus  # Match your Prometheus operator label selector
+
+      memory: 64Mi```
+
+
+
+telemetry-collector:### Grafana Dashboard
+
+  resources:
+
+    limits:Deploy with Grafana dashboard:
+
+      cpu: 200m
+
+      memory: 256Mi```yaml
+
+    requests:monitoring:
+
+      cpu: 100m  grafana:
+
+      memory: 128Mi    enabled: true
+
     dashboardsConfigMap: "telemetry-dashboards"
-```
 
-## Troubleshooting
+api-gateway:```
+
+  replicaCount: 1
+
+  autoscaling:## Troubleshooting
+
+    enabled: false
 
 ### Common Issues
 
-1. **Streamer pods not starting**
-   ```bash
-   # Check CSV data format
+dashboard:  
+
+  replicaCount: 11. **Streamer pods not starting**
+
+  autoscaling:   ```bash
+
+    enabled: false   # Check CSV data format
+
    kubectl logs -l app.kubernetes.io/component=streamer
-   
-   # Verify ConfigMap
-   kubectl get configmap -l app.kubernetes.io/name=telemetry-pipeline
-   ```
 
-2. **Collector persistence issues**
-   ```bash
+shared-resources:   
+
+  persistentVolumes:   # Verify ConfigMap
+
+    mqData:   kubectl get configmap -l app.kubernetes.io/name=telemetry-pipeline
+
+      size: 1Gi   ```
+
+    collectorData:
+
+      size: 2Gi2. **Collector persistence issues**
+
+EOF   ```bash
+
    # Check PVC status
-   kubectl get pvc -l app.kubernetes.io/name=telemetry-pipeline
-   
-   # Check storage class
+
+# Deploy with development values   kubectl get pvc -l app.kubernetes.io/name=telemetry-pipeline
+
+helm install gpu-telemetry-dev telemetry-pipeline/ -f dev-values.yaml   
+
+```   # Check storage class
+
    kubectl get storageclass
-   ```
 
-3. **API Gateway ingress not working**
-   ```bash
-   # Check ingress status
-   kubectl get ingress -l app.kubernetes.io/component=api-gateway
-   
+## Support   ```
+
+
+
+For issues and questions:3. **API Gateway ingress not working**
+
+1. Check the logs of relevant components   ```bash
+
+2. Verify service connectivity   # Check ingress status
+
+3. Check resource utilization   kubectl get ingress -l app.kubernetes.io/component=api-gateway
+
+4. Review Kubernetes events: `kubectl get events -n gpu-telemetry --sort-by=.metadata.creationTimestamp`   
+
    # Verify ingress controller
-   kubectl get pods -n ingress-nginx
+
+## Advanced Configuration   kubectl get pods -n ingress-nginx
+
    ```
 
-### Debug Commands
+See the individual chart `values.yaml` files for complete configuration options:
 
-```bash
-# View all telemetry pipeline resources
-kubectl get all -l app.kubernetes.io/name=telemetry-pipeline
+- `charts/shared-resources/values.yaml`### Debug Commands
 
+- `charts/mq-service/values.yaml`
+
+- `charts/telemetry-collector/values.yaml````bash
+
+- `charts/telemetry-streamer/values.yaml`# View all telemetry pipeline resources
+
+- `charts/api-gateway/values.yaml`kubectl get all -l app.kubernetes.io/name=telemetry-pipeline
+
+- `charts/dashboard/values.yaml`
 # Check component logs
 kubectl logs -l app.kubernetes.io/component=streamer -f
 kubectl logs -l app.kubernetes.io/component=collector -f

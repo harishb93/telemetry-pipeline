@@ -1,0 +1,13 @@
+apiVersion: v2
+name: telemetry-streamer
+description: Telemetry Streamer DaemonSet for GPU Telemetry Pipeline
+type: application
+version: 0.1.0
+appVersion: "1.0"
+keywords:
+  - telemetry
+  - gpu
+  - streamer
+  - daemonset
+maintainers:
+  - name: GPU Telemetry Team

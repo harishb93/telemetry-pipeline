@@ -1,0 +1,107 @@
+# Default values for api-gateway
+replicaCount: 2
+
+image:
+  repository: localhost:5000/api-gateway
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8081
+
+namespace: gpu-telemetry
+
+# Shared volume with collector
+sharedVolume:
+  enabled: true
+  existingClaim: collector-data-pvc
+  mountPath: /app/shared-data
+
+# Collector service dependency
+collectorService:
+  enabled: true
+  serviceName: telemetry-collector
+  port: 8080
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+env:
+  - name: PORT
+    value: "8081"
+  - name: COLLECTOR_URL
+    value: "http://telemetry-collector:8080"
+  - name: SHARED_DATA_PATH
+    value: "/app/shared-data"
+  - name: CORS_ORIGINS
+    value: "*"
+  - name: LOG_LEVEL
+    value: "INFO"
+
+healthCheck:
+  enabled: true
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8081
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 8081
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# Init container to wait for collector service
+initContainer:
+  enabled: true
+  image:
+    repository: busybox
+    tag: "1.35"
+  command:
+    - /bin/sh
+    - -c
+    - |
+      until nc -z telemetry-collector 8080; do
+        echo "Waiting for collector service..."
+        sleep 2
+      done
+      echo "Collector service is ready!"
+
+# Autoscaling
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+labels:
+  app: gpu-telemetry
+  component: api-gateway
+
+nodeSelector: {}
+tolerations: []
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - api-gateway
+        topologyKey: kubernetes.io/hostname

@@ -1,0 +1,13 @@
+apiVersion: v2
+name: shared-resources
+description: Shared resources for GPU Telemetry Pipeline (namespace, ConfigMaps, PVCs)
+type: application
+version: 0.1.0
+appVersion: "1.0"
+keywords:
+  - telemetry
+  - gpu
+  - monitoring
+  - shared
+maintainers:
+  - name: GPU Telemetry Team

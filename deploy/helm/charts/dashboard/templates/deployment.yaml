@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dashboard.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "dashboard.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "dashboard.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "dashboard.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.initContainer.enabled }}
+      initContainers:
+        - name: wait-for-api-gateway
+          image: "{{ .Values.initContainer.image.repository }}:{{ .Values.initContainer.image.tag }}"
+          command:
+            {{- toYaml .Values.initContainer.command | nindent 12 }}
+      {{- end }}
+      containers:
+        - name: dashboard
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            {{- toYaml .Values.env | nindent 12 }}
+          {{- if .Values.healthCheck.enabled }}
+          livenessProbe:
+            {{- toYaml .Values.healthCheck.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.healthCheck.readinessProbe | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

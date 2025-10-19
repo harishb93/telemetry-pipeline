@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "api-gateway.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "api-gateway.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "api-gateway.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "api-gateway.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.initContainer.enabled }}
+      initContainers:
+        - name: wait-for-collector
+          image: "{{ .Values.initContainer.image.repository }}:{{ .Values.initContainer.image.tag }}"
+          command:
+            {{- toYaml .Values.initContainer.command | nindent 12 }}
+      {{- end }}
+      containers:
+        - name: api-gateway
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            {{- toYaml .Values.env | nindent 12 }}
+          {{- if .Values.sharedVolume.enabled }}
+          volumeMounts:
+            - name: shared-data
+              mountPath: {{ .Values.sharedVolume.mountPath }}
+              readOnly: true
+          {{- end }}
+          {{- if .Values.healthCheck.enabled }}
+          livenessProbe:
+            {{- toYaml .Values.healthCheck.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.healthCheck.readinessProbe | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- if .Values.sharedVolume.enabled }}
+      volumes:
+        - name: shared-data
+          persistentVolumeClaim:
+            claimName: {{ .Values.sharedVolume.existingClaim }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
