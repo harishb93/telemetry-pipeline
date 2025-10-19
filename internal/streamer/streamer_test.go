@@ -33,15 +33,15 @@ func NewMockBroker() *MockBroker {
 func (m *MockBroker) Publish(topic string, msg mq.Message) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if m.closed {
 		return fmt.Errorf("broker is closed")
 	}
-	
+
 	if m.publishError != nil {
 		return m.publishError
 	}
-	
+
 	m.messages = append(m.messages, msg)
 	return nil
 }
@@ -63,7 +63,7 @@ func (m *MockBroker) SubscribeWithAck(topic string) (chan mq.Message, func(), er
 func (m *MockBroker) GetMessages() []mq.Message {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	result := make([]mq.Message, len(m.messages))
 	copy(result, m.messages)
 	return result
@@ -173,7 +173,7 @@ func TestPreProcessCSVByHostNames_ValidFiltering(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	
+
 	if result == csvPath {
 		t.Error("Expected filtered file path, got original path")
 	}
@@ -254,7 +254,7 @@ func TestPreProcessCSVByHostNames_CaseInsensitiveHeader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	
+
 	if result == csvPath {
 		t.Error("Expected filtering to work with case-insensitive header")
 	}
@@ -276,7 +276,7 @@ func TestPreProcessCSVByHostNames_WhitespaceHandling(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	
+
 	if result == csvPath {
 		t.Error("Expected filtering to work with whitespace handling")
 	}
@@ -333,7 +333,7 @@ func TestPreProcessCSVByHostNames_InsufficientColumns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	
+
 	// Should still process valid records
 	if result == csvPath {
 		t.Error("Expected filtering to create new file even with some invalid records")
@@ -385,7 +385,7 @@ func TestStreamer_Start_Success(t *testing.T) {
 	defer broker.Close()
 
 	streamer := NewStreamer(csvPath, 1, 1.0, "test-topic", broker)
-	
+
 	err := streamer.Start()
 	if err != nil {
 		t.Fatalf("Failed to start streamer: %v", err)
@@ -393,7 +393,7 @@ func TestStreamer_Start_Success(t *testing.T) {
 
 	// Give it time to process some records
 	time.Sleep(100 * time.Millisecond)
-	
+
 	streamer.Stop()
 
 	messages := broker.GetMessages()
@@ -407,12 +407,12 @@ func TestStreamer_Start_FileNotFound(t *testing.T) {
 	defer broker.Close()
 
 	streamer := NewStreamer("/nonexistent/file.csv", 1, 1.0, "test-topic", broker)
-	
+
 	err := streamer.Start()
 	if err == nil {
 		t.Error("Expected error for nonexistent file")
 	}
-	
+
 	if !strings.Contains(err.Error(), "failed to access CSV file") {
 		t.Errorf("Expected specific error message, got: %v", err)
 	}
@@ -426,12 +426,12 @@ func TestStreamer_Start_InvalidCSV(t *testing.T) {
 	defer broker.Close()
 
 	streamer := NewStreamer(csvPath, 1, 1.0, "test-topic", broker)
-	
+
 	err := streamer.Start()
 	if err == nil {
 		t.Error("Expected error for invalid CSV")
 	}
-	
+
 	if !strings.Contains(err.Error(), "failed to read CSV headers") {
 		t.Errorf("Expected specific error message, got: %v", err)
 	}
@@ -530,7 +530,7 @@ func TestStreamer_ReadHeaders_Success(t *testing.T) {
 	defer broker.Close()
 
 	streamer := NewStreamer(csvPath, 1, 1.0, "test-topic", broker)
-	
+
 	readHeaders, err := streamer.readHeaders()
 	if err != nil {
 		t.Fatalf("Failed to read headers: %v", err)
@@ -546,7 +546,7 @@ func TestStreamer_ReadHeaders_FileNotFound(t *testing.T) {
 	defer broker.Close()
 
 	streamer := NewStreamer("/nonexistent/file.csv", 1, 1.0, "test-topic", broker)
-	
+
 	_, err := streamer.readHeaders()
 	if err == nil {
 		t.Error("Expected error for nonexistent file")
@@ -560,7 +560,7 @@ func TestStreamer_ReadHeaders_EmptyFile(t *testing.T) {
 	defer broker.Close()
 
 	streamer := NewStreamer(csvPath, 1, 1.0, "test-topic", broker)
-	
+
 	_, err := streamer.readHeaders()
 	if err == nil {
 		t.Error("Expected error for empty file")
@@ -634,7 +634,7 @@ func TestStreamer_ParseRecord_EmptyHeaders(t *testing.T) {
 	defer broker.Close()
 	streamer := NewStreamer("", 1, 1.0, "test-topic", broker)
 
-	headers := []string{"gpu_id", "", "temperature"}  // Empty header
+	headers := []string{"gpu_id", "", "temperature"} // Empty header
 	record := []string{"gpu-001", "ignored", "72.5"}
 
 	telemetryData, err := streamer.parseRecord(headers, record)
@@ -735,8 +735,8 @@ func TestStreamer_ParseRecord_StringValues(t *testing.T) {
 		"gpu-001",
 		"host-A",
 		"not-a-number",
-		"maybe",  // Not a valid boolean
-		"",       // Empty string
+		"maybe",    // Not a valid boolean
+		"",         // Empty string
 		"12.34.56", // Invalid float format
 	}
 
@@ -777,7 +777,7 @@ func TestParseFloat(t *testing.T) {
 
 	for _, tc := range testCases {
 		result, err := parseFloat(tc.input)
-		
+
 		if tc.shouldErr {
 			if err == nil {
 				t.Errorf("Expected error for input %s, but got none", tc.input)
@@ -824,7 +824,7 @@ func TestParseBool(t *testing.T) {
 
 	for _, tc := range testCases {
 		result, err := parseBool(tc.input)
-		
+
 		if tc.shouldErr {
 			if err == nil {
 				t.Errorf("Expected error for input %s, but got none", tc.input)
@@ -851,17 +851,17 @@ func TestStreamer_ProcessCSVLoop_Context_Cancelled(t *testing.T) {
 	defer broker.Close()
 
 	streamer := NewStreamer(csvPath, 1, 1.0, "test-topic", broker)
-	
+
 	// Cancel context immediately
 	streamer.cancel()
 
 	recordsProcessed := 0
 	err := streamer.processCSVLoop(0, headers, &recordsProcessed, 0, streamer.logger.WithComponent("test"))
-	
+
 	if err != nil {
 		t.Errorf("Expected no error when context is cancelled, got: %v", err)
 	}
-	
+
 	if recordsProcessed != 0 {
 		t.Errorf("Expected no records processed when context cancelled, got: %d", recordsProcessed)
 	}
@@ -872,12 +872,12 @@ func TestStreamer_ProcessCSVLoop_FileNotFound(t *testing.T) {
 	defer broker.Close()
 
 	streamer := NewStreamer("/nonexistent/file.csv", 1, 1.0, "test-topic", broker)
-	
+
 	headers := []string{"id", "value"}
 	recordsProcessed := 0
-	
+
 	err := streamer.processCSVLoop(0, headers, &recordsProcessed, 0, streamer.logger.WithComponent("test"))
-	
+
 	if err == nil {
 		t.Error("Expected error for nonexistent file")
 	}
@@ -892,18 +892,18 @@ func TestStreamer_ProcessCSVLoop_RateLimit(t *testing.T) {
 	defer broker.Close()
 
 	streamer := NewStreamer(csvPath, 1, 1.0, "test-topic", broker)
-	
+
 	recordsProcessed := 0
 	rateInterval := 50 * time.Millisecond
-	
+
 	start := time.Now()
 	err := streamer.processCSVLoop(0, headers, &recordsProcessed, rateInterval, streamer.logger.WithComponent("test"))
 	elapsed := time.Since(start)
-	
+
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	
+
 	// Should have some delay due to rate limiting
 	expectedMinTime := time.Duration(recordsProcessed-1) * rateInterval
 	if recordsProcessed > 1 && elapsed < expectedMinTime {
@@ -985,7 +985,7 @@ func TestStreamer_ContinuousLoop(t *testing.T) {
 	streamer.Stop()
 
 	messages := broker.GetMessages()
-	
+
 	// Should receive more messages than records (due to looping)
 	minExpected := 4 // Should loop through at least twice
 	if len(messages) < minExpected {
@@ -1005,7 +1005,7 @@ func TestStreamer_RateControl_ZeroRate(t *testing.T) {
 
 	// Rate of 0 should mean no rate limiting
 	streamer := NewStreamer(csvPath, 1, 0.0, "test-topic", broker)
-	
+
 	start := time.Now()
 	err := streamer.Start()
 	if err != nil {
@@ -1037,7 +1037,7 @@ func TestStreamer_RateControl_HighRate(t *testing.T) {
 
 	// High rate should allow fast processing
 	streamer := NewStreamer(csvPath, 1, 100.0, "test-topic", broker)
-	
+
 	err := streamer.Start()
 	if err != nil {
 		t.Fatalf("Failed to start streamer: %v", err)
@@ -1047,7 +1047,7 @@ func TestStreamer_RateControl_HighRate(t *testing.T) {
 	streamer.Stop()
 
 	messages := broker.GetMessages()
-	
+
 	// Should process multiple loops with high rate
 	if len(messages) < 6 { // At least 2 complete loops
 		t.Errorf("Expected more messages with high rate, got %d", len(messages))
@@ -1084,7 +1084,7 @@ func TestStreamer_HandleJSONMarshalError(t *testing.T) {
 	// This is harder to test directly since json.Marshal rarely fails
 	// with our simple data types, but we can test the error handling path
 	// exists in the code coverage
-	
+
 	headers := []string{"id"}
 	records := [][]string{{"1"}}
 	csvPath := createTestCSV(t, headers, records)
@@ -1182,7 +1182,7 @@ func BenchmarkPreProcessCSVByHostNames(b *testing.B) {
 	headers := []string{"hostname", "gpu_id", "temperature", "utilization", "power_draw"}
 	records := make([][]string, 1000)
 	hosts := []string{"host-A", "host-B", "host-C", "host-D", "host-E"}
-	
+
 	for i := 0; i < 1000; i++ {
 		hostIdx := i % len(hosts)
 		records[i] = []string{
@@ -1193,25 +1193,25 @@ func BenchmarkPreProcessCSVByHostNames(b *testing.B) {
 			fmt.Sprintf("%.1f", float64(150+i%100)),
 		}
 	}
-	
+
 	tmpDir := b.TempDir()
 	csvPath := filepath.Join(tmpDir, "benchmark.csv")
-	
+
 	file, err := os.Create(csvPath)
 	if err != nil {
 		b.Fatalf("Failed to create benchmark CSV: %v", err)
 	}
 	defer file.Close()
-	
+
 	writer := csv.NewWriter(file)
 	writer.Write(headers)
 	for _, record := range records {
 		writer.Write(record)
 	}
 	writer.Flush()
-	
+
 	hostList := "host-A,host-C"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		result, err := PreProcessCSVByHostNames(csvPath, hostList)
@@ -1272,7 +1272,7 @@ func BenchmarkParseRecord(b *testing.B) {
 
 func BenchmarkParseFloat(b *testing.B) {
 	testValues := []string{"72.5", "0", "123", "-45.7", "1.23e2"}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		value := testValues[i%len(testValues)]
@@ -1282,7 +1282,7 @@ func BenchmarkParseFloat(b *testing.B) {
 
 func BenchmarkParseBool(b *testing.B) {
 	testValues := []string{"true", "false", "True", "False", "1", "0", "yes", "no"}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		value := testValues[i%len(testValues)]
@@ -1294,7 +1294,7 @@ func BenchmarkParseBool(b *testing.B) {
 
 func TestStreamer_Integration_CompleteWorkflow(t *testing.T) {
 	// Test complete workflow from CSV preprocessing to message publishing
-	
+
 	// Create CSV with mixed hostnames
 	headers := []string{"hostname", "gpu_id", "temperature", "utilization", "active"}
 	records := [][]string{
@@ -1304,7 +1304,7 @@ func TestStreamer_Integration_CompleteWorkflow(t *testing.T) {
 		{"host-C", "gpu-004", "72.0", "85.0", "true"},
 	}
 	originalCSV := createTestCSV(t, headers, records)
-	
+
 	// Step 1: Preprocess CSV
 	filteredCSV, err := PreProcessCSVByHostNames(originalCSV, "host-A,host-C")
 	if err != nil {
@@ -1315,33 +1315,33 @@ func TestStreamer_Integration_CompleteWorkflow(t *testing.T) {
 			os.Remove(filteredCSV)
 		}
 	}()
-	
+
 	// Step 2: Stream filtered CSV
 	broker := NewMockBroker()
 	defer broker.Close()
-	
+
 	streamer := NewStreamer(filteredCSV, 2, 20.0, "telemetry", broker)
 	err = streamer.Start()
 	if err != nil {
 		t.Fatalf("Failed to start streamer: %v", err)
 	}
-	
+
 	time.Sleep(200 * time.Millisecond)
 	streamer.Stop()
-	
+
 	// Step 3: Verify results
 	messages := broker.GetMessages()
 	if len(messages) == 0 {
 		t.Fatal("Expected messages from integration test")
 	}
-	
+
 	// Verify message content
 	var telemetryData TelemetryData
 	err = json.Unmarshal(messages[0].Payload, &telemetryData)
 	if err != nil {
 		t.Fatalf("Failed to unmarshal message: %v", err)
 	}
-	
+
 	// Should only contain host-A or host-C data
 	hostname, ok := telemetryData.Fields["hostname"].(string)
 	if !ok {
@@ -1350,7 +1350,7 @@ func TestStreamer_Integration_CompleteWorkflow(t *testing.T) {
 	if hostname != "host-A" && hostname != "host-C" {
 		t.Errorf("Expected hostname to be host-A or host-C, got: %s", hostname)
 	}
-	
+
 	// Verify all field types
 	if _, ok := telemetryData.Fields["gpu_id"].(string); !ok {
 		t.Error("Expected gpu_id to be string")
