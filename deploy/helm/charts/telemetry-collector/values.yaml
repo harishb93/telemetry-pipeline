@@ -10,7 +10,6 @@ service:
   type: ClusterIP
   ports:
     http: 8080
-    metrics: 9091
 
 namespace: gpu-telemetry
 
@@ -24,7 +23,7 @@ mqService:
   enabled: true
   serviceName: mq-service
   adminPort: 9090
-  brokerPort: 9092
+  brokerPort: 9091
 
 resources:
   limits:
@@ -36,7 +35,7 @@ resources:
 
 env:
   - name: MQ_URL
-    value: "http://mq-service:9090"
+    value: "mq-service.gpu-telemetry.svc.cluster.local:9091"
   - name: DATA_DIR
     value: "/app/data"
   - name: HEALTH_PORT

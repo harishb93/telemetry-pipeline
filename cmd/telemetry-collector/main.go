@@ -24,7 +24,7 @@ func main() {
 		checkpointEnabled = flag.Bool("checkpoint", true, "Enable checkpoint persistence")
 		checkpointDir     = flag.String("checkpoint-dir", "./checkpoints", "Directory for checkpoint files")
 		healthPort        = flag.String("health-port", "9090", "Port for health check server")
-		grpcPort          = flag.String("grpc-port", "9092", "Port for gRPC server")
+		mqGrpcPort        = flag.String("mq-grpc-port", "9091", "Port for gRPC server")
 		mqServiceURL      = flag.String("mq-url", "http://localhost:9090", "URL of the MQ service")
 		mqTopic           = flag.String("mq-topic", "telemetry", "MQ topic to subscribe to")
 	)
@@ -38,7 +38,7 @@ func main() {
 		"checkpoint_enabled", *checkpointEnabled,
 		"checkpoint_dir", *checkpointDir,
 		"health_port", *healthPort,
-		"grpc_port", *grpcPort,
+		"grpc_port", *mqGrpcPort,
 		"mq_service_url", *mqServiceURL,
 		"mq_topic", *mqTopic)
 
@@ -47,15 +47,15 @@ func main() {
 	grpcAddr := *mqServiceURL
 	// Default to localhost if URL is not provided
 	if grpcAddr == "http://localhost:9090" {
-		grpcAddr = "localhost:" + *grpcPort
+		grpcAddr = "localhost:" + *mqGrpcPort
 	} else {
 		// Remove http:// prefix
 		grpcAddr = strings.TrimPrefix(grpcAddr, "http://")
-		// Remove any existing port and replace with grpcPort
+		// Remove any existing port and replace with mqGrpcPort
 		if idx := strings.LastIndex(grpcAddr, ":"); idx != -1 {
 			grpcAddr = grpcAddr[:idx]
 		}
-		grpcAddr = grpcAddr + ":" + *grpcPort
+		grpcAddr = grpcAddr + ":" + *mqGrpcPort
 	}
 
 	broker, err := mq.NewGRPCBrokerClient(grpcAddr)

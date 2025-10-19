@@ -8,9 +8,9 @@ image:
 
 service:
   type: ClusterIP
-  port: 5173
+  port: 80
 
-namespace: default  # Dashboard runs in default namespace for easier access
+namespace: gpu-telemetry  # Dashboard runs in gpu-telemetry namespace for easier access
 
 # API Gateway service dependency
 apiGateway:
@@ -45,7 +45,7 @@ resources:
 
 env:
   - name: VITE_API_BASE_URL
-    value: "http://api-gateway.gpu-telemetry.svc.cluster.local:8081"
+    value: "http://api-gateway:8081"
   - name: VITE_REFRESH_INTERVAL
     value: "30000"  # 30 seconds
   - name: NODE_ENV
@@ -56,7 +56,7 @@ healthCheck:
   livenessProbe:
     httpGet:
       path: /
-      port: 5173
+      port: 80
     initialDelaySeconds: 30
     periodSeconds: 10
     timeoutSeconds: 5
@@ -64,7 +64,7 @@ healthCheck:
   readinessProbe:
     httpGet:
       path: /
-      port: 5173
+      port: 80
     initialDelaySeconds: 10
     periodSeconds: 5
     timeoutSeconds: 5
@@ -80,7 +80,7 @@ initContainer:
     - /bin/sh
     - -c
     - |
-      until nc -z api-gateway.gpu-telemetry.svc.cluster.local 8081; do
+      until nc -z api-gateway 8081; do
         echo "Waiting for API gateway service..."
         sleep 2
       done
