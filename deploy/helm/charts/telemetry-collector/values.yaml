@@ -1,5 +1,5 @@
 # Default values for telemetry-collector
-replicaCount: 1
+replicaCount: 2
 
 image:
   repository: localhost:5000/telemetry-collector
@@ -41,7 +41,7 @@ env:
   - name: HEALTH_PORT
     value: "8080"
   - name: WORKERS
-    value: "4"
+    value: "1"
   - name: MAX_ENTRIES
     value: "10000"
   - name: MQ_TOPIC

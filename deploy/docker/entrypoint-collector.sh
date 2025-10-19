@@ -2,7 +2,7 @@
 set -e
 
 # Default values
-WORKERS=${WORKERS:-"4"}
+WORKERS=${WORKERS:-"1"}
 DATA_DIR=${DATA_DIR:-"/data"}
 MAX_ENTRIES=${MAX_ENTRIES:-"10000"}
 HEALTH_PORT=${HEALTH_PORT:-"8080"}

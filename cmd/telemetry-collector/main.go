@@ -18,7 +18,7 @@ func main() {
 
 	// Command line flags
 	var (
-		workers           = flag.Int("workers", 4, "Number of worker goroutines")
+		workers           = flag.Int("workers", 1, "Number of worker goroutines")
 		dataDir           = flag.String("data-dir", "./data", "Directory for file storage")
 		maxEntriesPerGPU  = flag.Int("max-entries", 1000, "Maximum entries per GPU in memory storage")
 		checkpointEnabled = flag.Bool("checkpoint", true, "Enable checkpoint persistence")

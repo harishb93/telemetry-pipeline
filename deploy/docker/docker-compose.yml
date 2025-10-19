@@ -41,7 +41,7 @@ services:
     ports:
       - "8080:8080"    # Health endpoint
     environment:
-      - WORKERS=4
+      - WORKERS=1
       - DATA_DIR=/data
       - MAX_ENTRIES=10000
       - HEALTH_PORT=8080
