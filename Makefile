@@ -6,7 +6,7 @@ TAG ?= latest
 HELM_RELEASE ?= telemetry-pipeline
 HELM_NAMESPACE ?= default
 
-.PHONY: help build build-dashboard test coverage clean clean-docker openapi-gen docker-build docker-build-and-push docker-push docker-deploy helm-install helm-uninstall helm-status helm-quickstart helm-quickstart-down helm-quickstart-status helm-quickstart-logs helm-port-forward run-collector run-streamer run-api run-mq lint deps all deploy dev ci registry-start registry-stop registry-status system-tests system-tests-quick system-tests-performance docker-up docker-down docker-logs docker-status docker-health-check docker-setup docker-setup-build docker-setup-down sample-data
+.PHONY: help build build-for-system-tests build-dashboard test coverage clean clean-docker openapi-gen docker-build docker-build-and-push docker-push docker-deploy helm-install helm-uninstall helm-status helm-quickstart helm-quickstart-down helm-quickstart-status helm-quickstart-logs helm-port-forward run-collector run-streamer run-api run-mq lint deps all deploy dev ci registry-start registry-stop registry-status system-tests system-tests-quick system-tests-performance docker-up docker-down docker-logs docker-status docker-health-check docker-setup docker-setup-build docker-setup-down sample-data
 
 # Default target (this will be replaced by the comprehensive help target later)
 	@echo "  run-streamer  - Run telemetry streamer"
@@ -22,6 +22,9 @@ HELM_NAMESPACE ?= default
 
 # Build targets
 build: build-collector build-streamer build-api build-mq build-dashboard
+
+# Build system-test targets
+build-for-system-tests: build-collector build-streamer build-api build-mq
 
 build-collector:
 	@echo "Building telemetry collector..."
@@ -76,7 +79,7 @@ coverage: test
 	@echo "Coverage report generated: coverage.html"
 
 # System test targets
-system-tests: build
+system-tests: build-for-system-tests
 	@echo "Running comprehensive system tests..."
 	@echo "This will test end-to-end functionality with all components"
 	@echo "Building required binaries first..."
@@ -87,7 +90,7 @@ system-tests: build
 		./...
 	@echo "System tests completed!"
 
-system-tests-quick: build
+system-tests-quick: build-for-system-tests
 	@echo "Running quick system tests (functional only)..."
 	@make build-collector build-streamer build-api >/dev/null 2>&1
 	cd tests && go test -v -timeout=5m -tags=system \
@@ -509,15 +512,16 @@ help:
 	@echo "Available targets:"
 	@echo ""
 	@echo "🏗️  Build Targets:"
-	@echo "  build             - Build all components (collector, streamer, api-gateway, mq-service, dashboard)"
-	@echo "  build-dashboard   - Build React dashboard only"
-	@echo "  deps              - Install Go and Node.js dependencies"
+	@echo "  build             		- Build all components (collector, streamer, api-gateway, mq-service, dashboard)"
+	@echo "  build-for-system-tests - Build components for system tests (collector, streamer, api-gateway, mq-service)"
+	@echo "  build-dashboard   		- Build React dashboard only"
+	@echo "  deps              		- Install Go and Node.js dependencies"
 	@echo ""
 	@echo "🧪 Test Targets:"
-	@echo "  test              - Run unit tests with coverage"
-	@echo "  test-integration  - Run integration tests"
-	@echo "  system-tests      - Run comprehensive system tests"
-	@echo "  system-tests-quick - Run quick system tests"
+	@echo "  test              		- Run unit tests with coverage"
+	@echo "  test-integration  		- Run integration tests"
+	@echo "  system-tests      		- Run comprehensive system tests"
+	@echo "  system-tests-quick 	- Run quick system tests"
 	@echo "  system-tests-performance - Run performance tests"
 	@echo "  coverage          - Generate test coverage report"
 	@echo ""
@@ -572,4 +576,4 @@ help:
 	@echo "  lint              - Run code linter"
 	@echo "  help              - Show this help message"
 
-.PHONY: build build-dashboard test test-integration coverage lint clean clean-docker docker-build docker-build-and-push docker-push docker-up docker-down docker-logs docker-status docker-health-check docker-setup docker-setup-build docker-setup-down docs deps deploy helm-install helm-uninstall helm-status helm-quickstart helm-quickstart-down helm-quickstart-status helm-quickstart-logs helm-port-forward registry-start registry-stop registry-status sample-data help run-collector run-streamer run-api run-mq system-tests system-tests-quick system-tests-performance all dev ci openapi-gen
+.PHONY: build build-for-system-tests build-dashboard test test-integration coverage lint clean clean-docker docker-build docker-build-and-push docker-push docker-up docker-down docker-logs docker-status docker-health-check docker-setup docker-setup-build docker-setup-down docs deps deploy helm-install helm-uninstall helm-status helm-quickstart helm-quickstart-down helm-quickstart-status helm-quickstart-logs helm-port-forward registry-start registry-stop registry-status sample-data help run-collector run-streamer run-api run-mq system-tests system-tests-quick system-tests-performance all dev ci openapi-gen

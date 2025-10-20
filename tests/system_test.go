@@ -22,8 +22,10 @@ type SystemTestSuite struct {
 	collectorCmd   *exec.Cmd
 	streamerCmd    *exec.Cmd
 	apiGatewayCmd  *exec.Cmd
+	mqServiceCmd   *exec.Cmd
 	collectorPort  string
 	apiGatewayPort string
+	mqServicePort  string
 	streamerRate   string
 	testDataFile   string
 	ctx            context.Context
@@ -59,6 +61,7 @@ func SetupSystemTest(t *testing.T) *SystemTestSuite {
 		t:              t,
 		collectorPort:  "18080",
 		apiGatewayPort: "18081",
+		mqServicePort:  "19090",
 		streamerRate:   "10", // 10 messages per second for faster testing
 	}
 
@@ -79,7 +82,8 @@ func SetupSystemTest(t *testing.T) *SystemTestSuite {
 	// Build binaries
 	suite.buildBinaries()
 
-	// Start services in order
+	// Start services in order: MQ service first, then collector, then API gateway, then streamer
+	suite.startMQService()
 	suite.startCollector()
 	suite.startAPIGateway()
 	suite.startStreamer()
@@ -147,7 +151,7 @@ func (s *SystemTestSuite) createTestData() {
 func (s *SystemTestSuite) buildBinaries() {
 	s.t.Logf("Building binaries for system tests...")
 
-	binaries := []string{"telemetry-collector", "telemetry-streamer", "api-gateway"}
+	binaries := []string{"telemetry-collector", "telemetry-streamer", "api-gateway", "mq-service"}
 
 	// Project root is parent directory of tests
 	projectRoot := filepath.Join("..", "")
@@ -162,6 +166,35 @@ func (s *SystemTestSuite) buildBinaries() {
 		}
 		s.t.Logf("Built %s successfully", binary)
 	}
+}
+
+// startMQService starts the MQ service
+func (s *SystemTestSuite) startMQService() {
+	s.t.Logf("Starting MQ service on port %s", s.mqServicePort)
+
+	mqServiceBinary := filepath.Join(s.tempDir, "mq-service")
+	mqDataDir := filepath.Join(s.tempDir, "mq_data")
+
+	os.MkdirAll(mqDataDir, 0755)
+
+	s.mqServiceCmd = exec.CommandContext(s.ctx, mqServiceBinary,
+		fmt.Sprintf("--http-port=%s", s.mqServicePort),
+		fmt.Sprintf("--persistence-dir=%s", mqDataDir),
+		"--persistence=true",
+	)
+
+	s.mqServiceCmd.Stdout = &logWriter{name: "mq-service", t: s.t}
+	s.mqServiceCmd.Stderr = &logWriter{name: "mq-service", t: s.t}
+
+	err := s.mqServiceCmd.Start()
+	if err != nil {
+		s.t.Fatalf("Failed to start MQ service: %v", err)
+	}
+
+	s.t.Logf("MQ service started (PID: %d)", s.mqServiceCmd.Process.Pid)
+
+	// Wait a moment for MQ service to be ready
+	time.Sleep(2 * time.Second)
 }
 
 // startCollector starts the telemetry collector service
@@ -180,7 +213,8 @@ func (s *SystemTestSuite) startCollector() {
 		fmt.Sprintf("--data-dir=%s", collectorDataDir),
 		fmt.Sprintf("--checkpoint-dir=%s", checkpointDir),
 		fmt.Sprintf("--health-port=%s", s.collectorPort),
-		"--broker-port=19090",
+		fmt.Sprintf("--mq-url=http://localhost:%s", s.mqServicePort),
+		"--mq-topic=telemetry",
 		"--max-entries=1000",
 		"--checkpoint=true",
 	)
@@ -207,6 +241,7 @@ func (s *SystemTestSuite) startAPIGateway() {
 
 	s.apiGatewayCmd = exec.CommandContext(s.ctx, apiGatewayBinary,
 		fmt.Sprintf("--port=%s", s.apiGatewayPort),
+		fmt.Sprintf("--collector-port=%s", s.collectorPort),
 		fmt.Sprintf("--data-dir=%s", apiDataDir),
 	)
 
@@ -236,7 +271,8 @@ func (s *SystemTestSuite) startStreamer() {
 		fmt.Sprintf("--csv-file=%s", s.testDataFile),
 		"--workers=1",
 		fmt.Sprintf("--rate=%s", s.streamerRate),
-		"--broker-url=http://localhost:19090",
+		fmt.Sprintf("--broker-url=http://localhost:%s", s.mqServicePort),
+		"--topic=telemetry",
 	)
 
 	s.streamerCmd.Stdout = &logWriter{name: "streamer", t: s.t}
@@ -292,8 +328,8 @@ func (s *SystemTestSuite) waitForService(url, serviceName string) {
 
 // stopServices gracefully stops all running services
 func (s *SystemTestSuite) stopServices() {
-	services := []*exec.Cmd{s.streamerCmd, s.apiGatewayCmd, s.collectorCmd}
-	names := []string{"streamer", "api-gateway", "collector"}
+	services := []*exec.Cmd{s.streamerCmd, s.apiGatewayCmd, s.collectorCmd, s.mqServiceCmd}
+	names := []string{"streamer", "api-gateway", "collector", "mq-service"}
 
 	for i, cmd := range services {
 		if cmd != nil && cmd.Process != nil {
