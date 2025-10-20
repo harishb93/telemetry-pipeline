@@ -51,7 +51,7 @@ jobs:
       run: |
         export TAG=${{ steps.version.outputs.VERSION }}
         export REGISTRY=${{ secrets.DOCKER_USERNAME }}
-        make docker-build
+        make docker-build-pipeline
         # make docker-push
     
     # - name: Create GitHub Release

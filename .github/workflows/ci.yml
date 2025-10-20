@@ -101,7 +101,7 @@ jobs:
       uses: docker/setup-buildx-action@v3
     
     - name: Build Docker images
-      run: make docker-build
+      run: make docker-build-pipeline
 
   security:
     runs-on: ubuntu-latest
