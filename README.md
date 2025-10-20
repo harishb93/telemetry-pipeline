@@ -27,9 +27,9 @@ cd telemetry-pipeline/deploy/helm
 ./quickstart.sh
 ```
 
-![QuickStart Help](docs/QuickStart-Help.gif)
+![QuickStart Help](docs/QuickStartHelp.gif)
 
-![QuickStart Deploy](docs/QuickStart-Deploy.gif)
+![QuickStart Deploy](docs/QuickStartDeploy.gif)
 
 ![Dashboard](docs/Dashboard.gif)
 
