@@ -1,11 +1,15 @@
 package persistence
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -117,29 +121,46 @@ func (fs *FileStorage) WriteTelemetry(telemetry interface{}) error {
 		}
 	}()
 
+	// cross-process critical section
+	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
+		return fmt.Errorf("failed to lock file %s: %w", filePath, err)
+	}
+	defer func() {
+		if err := syscall.Flock(int(file.Fd()), syscall.LOCK_UN); err != nil {
+			fmt.Printf("Warning: failed to unlock file: %v\n", err)
+		}
+	}()
+
 	// Marshal telemetry data to JSON
 	jsonData, err := json.Marshal(telemetry)
 	if err != nil {
 		return fmt.Errorf("failed to marshal telemetry data: %w", err)
 	}
 
-	// Check if data already exists in file
-	decoder := json.NewDecoder(file)
-	targetLine := string(jsonData)
-	exists := false
+	var target Telemetry
+	if err := json.Unmarshal(jsonData, &target); err != nil {
+		return fmt.Errorf("failed to unmarshal telemetry data: %w", err)
+	}
+
+	// rewind for duplicate scan
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("failed to rewind file %s: %w", filePath, err)
+	}
+
+	decoder := json.NewDecoder(bufio.NewReader(file))
 	for decoder.More() {
-		var existingData json.RawMessage
-		if err := decoder.Decode(&existingData); err != nil {
+		var existing Telemetry
+		if err := decoder.Decode(&existing); err != nil {
 			continue // Skip malformed lines
 		}
-		if string(existingData) == targetLine {
-			exists = true
-			break
+		if reflect.DeepEqual(existing, target) {
+			return nil // Data already exists, skip writing
 		}
 	}
 
-	if exists {
-		return nil // Data already exists, skip writing
+	// append after duplicate check
+	if _, err := file.Seek(0, io.SeekEnd); err != nil {
+		return fmt.Errorf("failed to seek file %s: %w", filePath, err)
 	}
 
 	// Write JSON line
