@@ -39,6 +39,7 @@ vendor/
 # Coverage files
 *.cover
 coverage.out
+coverage.html
 
 #Generated JSON files
 *.jsonl

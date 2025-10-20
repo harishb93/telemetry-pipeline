@@ -55,8 +55,13 @@ func (d *DirectBrokerClient) SubscribeWithAck(topic string) (chan Message, func(
 	go d.pollMessages(topic, msgCh, stopCh)
 
 	unsubscribe := func() {
-		close(stopCh)
-		close(msgCh)
+		select {
+		case <-stopCh:
+			// Already stopped
+		default:
+			close(stopCh)
+		}
+		// Don't close msgCh here - let the polling goroutine handle it
 	}
 
 	return msgCh, unsubscribe, nil
@@ -66,6 +71,7 @@ func (d *DirectBrokerClient) SubscribeWithAck(topic string) (chan Message, func(
 func (d *DirectBrokerClient) pollMessages(topic string, msgCh chan Message, stopCh chan struct{}) {
 	ticker := time.NewTicker(1 * time.Second) // Poll every second
 	defer ticker.Stop()
+	defer close(msgCh) // Close message channel when polling stops
 
 	for {
 		select {
