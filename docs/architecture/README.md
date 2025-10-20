@@ -15,16 +15,21 @@ The GPU Telemetry Pipeline is a modern, production-ready system that streams GPU
 
 ## High-Level System Architecture
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   CSV Files     │    │  Custom MQ      │    │   Collectors    │    │    Storage      │
-│                 │    │                 │    │                 │    │                 │
-│ • GPU metrics   │───▶│ • In-memory     │───▶│ • Type safety   │───▶│ • File (JSONL)  │
-│ • Flexible      │    │ • Persistence   │    │ • Concurrency   │    │ • Memory (LRU)  │
-│   schema        │    │ • Pub/Sub       │    │ • Checkpoints   │    │ • Health APIs   │
-│ • Continuous    │    │ • Acknowledgment│    │ • Health checks │    │ • Statistics    │
-│   streaming     │    │ • Admin APIs    │    │ • Error handling│    │                 │
-└─────────────────┘    └─────────────────┘    └─────────────────┘    └─────────────────┘
+```mermaid
+graph LR
+    A[CSV Files<br/>• GPU metrics<br/>• Flexible schema<br/>• Continuous streaming] 
+    B[Custom MQ<br/>• In-memory<br/>• Persistence<br/>• Pub/Sub<br/>• Acknowledgment<br/>• Admin APIs]
+    C[Collectors<br/>• Type safety<br/>• Concurrency<br/>• Checkpoints<br/>• Health checks<br/>• Error handling] 
+    D[Storage<br/>• File JSONL<br/>• Memory LRU<br/>• Health APIs<br/>• Statistics]
+    
+    A -->|Streams| B
+    B -->|Delivers| C  
+    C -->|Persists| D
+    
+    style A fill:#e1f5fe
+    style B fill:#f3e5f5
+    style C fill:#e8f5e8
+    style D fill:#fff3e0
 ```
 
 ---
@@ -42,16 +47,16 @@ The GPU Telemetry Pipeline is a modern, production-ready system that streams GPU
 - Continuous loop with graceful shutdown support
 
 **Data Flow**:
-```
-CSV File
-   ↓
-Parse Record (flexible schema detection)
-   ↓
-Convert Types (string → number conversion)
-   ↓
-Create JSON Message
-   ↓
-Publish to MQ Topic
+
+```mermaid
+flowchart TD
+    A[CSV File] --> B[Parse Record<br/>flexible schema detection]
+    B --> C[Convert Types<br/>string → number conversion]
+    C --> D[Create JSON Message]
+    D --> E[Publish to MQ Topic]
+    
+    style A fill:#e3f2fd
+    style E fill:#f3e5f5
 ```
 
 **Scalability**:
@@ -66,16 +71,20 @@ Publish to MQ Topic
 **Purpose**: In-memory message broker with optional persistence for reliable message delivery.
 
 **Architecture**:
-```
-Publisher (Streamer)
-   ↓
-[Topic Manager]
-   ├─→ Topic 1 (GPU Telemetry)
-   │    ├─→ [In-Memory Queue]
-   │    ├─→ [Optional Disk Buffer]
-   │    └─→ Subscribers (Collectors)
-   │
-   └─→ Topic 2, 3, ... (Future topics)
+
+```mermaid
+graph TD
+    A[Publisher<br/>Streamer] --> B[Topic Manager]
+    B --> C[Topic 1<br/>GPU Telemetry]
+    B --> D[Topic 2, 3, ...<br/>Future topics]
+    
+    C --> E[In-Memory Queue]
+    C --> F[Optional Disk Buffer]  
+    C --> G[Subscribers<br/>Collectors]
+    
+    style A fill:#e1f5fe
+    style B fill:#f3e5f5
+    style G fill:#e8f5e8
 ```
 
 **Key Features**:
@@ -89,18 +98,19 @@ Publisher (Streamer)
 - **Admin Endpoints**: Real-time statistics and health monitoring
 
 **Message Lifecycle**:
-```
-1. Message Published
-   ↓
-2. Stored in In-Memory Queue
-   ↓
-3. Delivered to All Subscribers
-   ↓
-4. Subscriber Processes Message
-   ↓
-5. Subscriber Acknowledges
-   ↓
-6. Message Removed from Queue
+
+```mermaid
+sequenceDiagram
+    participant P as Publisher
+    participant Q as In-Memory Queue
+    participant S as Subscriber
+    
+    P->>Q: 1. Publish Message
+    Q->>Q: 2. Store in Queue
+    Q->>S: 3. Deliver to Subscriber
+    S->>S: 4. Process Message
+    S->>Q: 5. Send Acknowledgment
+    Q->>Q: 6. Remove from Queue
 ```
 
 **Reliability Guarantees**:
@@ -115,23 +125,27 @@ Publisher (Streamer)
 **Purpose**: Consumes telemetry messages and provides dual-layer storage with querying capabilities.
 
 **Architecture**:
-```
-MQ Subscriber
-   ↓
-Message Processor (Worker Pool)
-   ├──→ Parse JSON
-   ├──→ Validate Structure
-   ├──→ Track GPU ID
-   └──→ Split Storage
-         ├─→ File Storage (JSONL)
-         │   └─→ Per-GPU files (data/gpu_0.jsonl, etc.)
-         │
-         └─→ Memory Storage (LRU Cache)
-             └─→ Fast in-memory access
 
-Checkpoint System
-   ↓
-Recovery State File
+```mermaid
+graph TD
+    A[MQ Subscriber] --> B[Message Processor<br/>Worker Pool]
+    B --> C[Parse JSON]
+    B --> D[Validate Structure]
+    B --> E[Track GPU ID]
+    B --> F[Split Storage]
+    
+    F --> G[File Storage JSONL]
+    F --> H[Memory Storage LRU Cache]
+    
+    G --> I[Per-GPU files<br/>data/gpu_0.jsonl, etc.]
+    H --> J[Fast in-memory access]
+    
+    K[Checkpoint System] --> L[Recovery State File]
+    
+    style A fill:#f3e5f5
+    style B fill:#e8f5e8
+    style G fill:#fff3e0
+    style H fill:#fce4ec
 ```
 
 **Dual Storage Strategy**:
@@ -153,46 +167,37 @@ Recovery State File
 
 ### Real-Time Data Pipeline
 
-```
-Time: 0.0s
-┌─────────────────┐
-│  CSV Streamer   │
-│  (gpu_0, 72.3°C)│
-└────────┬────────┘
-         │ Publish to MQ
-         ↓
-    ┌────────────┐
-    │  MQ Broker │
-    └────┬───────┘
-         │ Route to subscribers
-         ↓
-  ┌──────────────────┐
-  │  Collector 1     │
-  │ (Worker Pool)    │
-  └────────┬─────────┘
-           ├─→ Write to disk (gpu_0.jsonl)
-           ├─→ Update LRU cache
-           └─→ Acknowledge message
-
-Time: 0.5s → Repeat for next telemetry point
+```mermaid
+graph TD
+    A[CSV Streamer<br/>gpu_0, 72.3°C<br/>Time: 0.0s] -->|Publish to MQ| B[MQ Broker]
+    B -->|Route to subscribers| C[Collector 1<br/>Worker Pool]
+    C --> D[Write to disk<br/>gpu_0.jsonl]
+    C --> E[Update LRU cache]
+    C --> F[Acknowledge message]
+    
+    G[Time: 0.5s<br/>Repeat cycle] -.-> A
+    
+    style A fill:#e1f5fe
+    style B fill:#f3e5f5
+    style C fill:#e8f5e8
 ```
 
 ### Message Processing Sequence
 
-```
-Streamer                 MQ                    Collector
-   │                     │                         │
-   ├─ Publish msg ──────→│                         │
-   │                     ├─ Deliver to sub ──────→│
-   │                     │                      [Process]
-   │                     │                         │
-   │                     │                    ┌────┴────┐
-   │                     │                    │ Storage │
-   │                     │                    └────┬────┘
-   │                     │                         │
-   │                     │← Acknowledge ──────────│
-   │                     │                         │
-   │                  [Confirmed]                  │
+```mermaid
+sequenceDiagram
+    participant S as Streamer
+    participant MQ as MQ Broker
+    participant C as Collector
+    participant St as Storage
+    
+    S->>MQ: Publish message
+    MQ->>C: Deliver to subscriber
+    C->>C: Process message
+    C->>St: Store data
+    St-->>C: Confirm storage
+    C->>MQ: Acknowledge message
+    MQ->>MQ: Mark as confirmed
 ```
 
 ---
@@ -221,10 +226,19 @@ Streamer                 MQ                    Collector
 
 ### Data Access APIs
 
+**API Gateway (Port 8081)**:
 - **GPU List**: `GET /api/v1/gpus`
-- **Telemetry Data**: `GET /api/v1/gpus/{gpu_id}/telemetry`
-- **Statistics**: `GET /stats`
+- **GPU Telemetry**: `GET /api/v1/gpus/{id}/telemetry`
+- **Host List**: `GET /api/v1/hosts`
+- **Host GPUs**: `GET /api/v1/hosts/{hostname}/gpus`
 - **Health Status**: `GET /health`
+- **API Documentation**: `GET /swagger/`
+
+**MQ Service (Port 9090/9091)**:
+- **Publish Message**: `POST /publish/{topic}`
+- **Broker Stats**: `GET /stats`
+- **Health Status**: `GET /health`
+- **gRPC Interface**: Port 9091
 
 ---
 
@@ -232,45 +246,47 @@ Streamer                 MQ                    Collector
 
 ### Single Machine (Development)
 
-```
-┌──────────────────────────┐
-│    Docker Container      │
-│  ┌────────────────────┐  │
-│  │  All Components    │  │
-│  │  (MQ + Streamer +  │  │
-│  │   Collectors)      │  │
-│  └────────────────────┘  │
-└──────────────────────────┘
+```mermaid
+graph TB
+    subgraph DC["Docker Container"]
+        subgraph AC["All Components"]
+            MQ[MQ Service]
+            ST[Streamer]
+            CO[Collectors]
+        end
+    end
+    
+    style DC fill:#e3f2fd
+    style AC fill:#f5f5f5
 ```
 
 ### Kubernetes (Production)
 
-```
-┌─────────────────────────────────────────────────────────┐
-│              Kubernetes Cluster                          │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│  Namespace: gpu-telemetry                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
-│  │  Streamer    │  │  Collector   │  │ API Gateway  │ │
-│  │  DaemonSet   │  │  Deployment  │  │ Deployment   │ │
-│  │  (2 replicas)│  │  (2 replicas)│  │ (2 replicas) │ │
-│  └──────────────┘  └──────────────┘  └──────────────┘ │
-│       ↓                   ↓                  ↓          │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │  MQ Service (Deployment)                         │  │
-│  │  • In-memory message broker                      │  │
-│  │  • Stateless for scaling                         │  │
-│  └──────────────────────────────────────────────────┘  │
-│       ↑                                                  │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │  Persistent Volume (for MQ optional persistence)│  │
-│  └──────────────────────────────────────────────────┘  │
-│                                                          │
-└─────────────────────────────────────────────────────────┘
-         ↓
-    [Dashboard]
-    (React Frontend)
+```mermaid
+graph TB
+    subgraph K8S["Kubernetes Cluster"]
+        subgraph NS["Namespace: gpu-telemetry"]
+            ST[Streamer<br/>DaemonSet<br/>2 replicas]
+            CO[Collector<br/>Deployment<br/>2 replicas]
+            AG[API Gateway<br/>Deployment<br/>2 replicas]
+            
+            MQ[MQ Service<br/>Deployment<br/>• In-memory broker<br/>• Stateless scaling]
+            
+            PV[Persistent Volume<br/>MQ optional persistence]
+        end
+    end
+    
+    DASH[Dashboard<br/>React Frontend]
+    
+    ST --> MQ
+    CO --> MQ
+    AG --> MQ
+    MQ --> PV
+    K8S --> DASH
+    
+    style K8S fill:#e8f5e8
+    style NS fill:#f5f5f5
+    style DASH fill:#fce4ec
 ```
 
 ---
@@ -281,19 +297,21 @@ Streamer                 MQ                    Collector
 
 Each component uses a configurable worker pool for concurrent processing:
 
-```
-Task Queue
-    ↓
-┌─────────────────────────┐
-│   Worker Pool (N=4)     │
-├─────────────────────────┤
-│ Worker 1: Proc task A   │
-│ Worker 2: Proc task B   │
-│ Worker 3: Proc task C   │
-│ Worker 4: Waiting       │
-└─────────────────────────┘
-    ↓
-Results
+```mermaid
+graph TD
+    TQ[Task Queue] --> WP[Worker Pool N=4]
+    
+    subgraph WP["Worker Pool (N=4)"]
+        W1[Worker 1<br/>Processing task A]
+        W2[Worker 2<br/>Processing task B]  
+        W3[Worker 3<br/>Processing task C]
+        W4[Worker 4<br/>Waiting]
+    end
+    
+    WP --> R[Results]
+    
+    style TQ fill:#e3f2fd
+    style R fill:#e8f5e8
 ```
 
 **Benefits**:
@@ -308,34 +326,31 @@ Results
 
 ### Circuit Pattern
 
-```
-Normal State
-    ↓
-    Error Detected
-    ↓
-    Exponential Backoff
-    ↓
-    Retry with Jitter
-    ↓
-    Success OR Failure Logging
+```mermaid
+stateDiagram-v2
+    [*] --> Normal
+    Normal --> Error: Error Detected
+    Error --> Backoff: Exponential Backoff
+    Backoff --> Retry: Retry with Jitter
+    Retry --> Normal: Success
+    Retry --> Logging: Failure
+    Logging --> [*]
 ```
 
 ### Graceful Shutdown
 
 All components support clean shutdown on `SIGINT`/`SIGTERM`:
 
-```
-Shutdown Signal
-    ↓
-Stop Accepting New Work
-    ↓
-Wait for In-Flight Operations
-    ↓
-Flush Pending Data
-    ↓
-Close Connections
-    ↓
-Clean Exit (code 0)
+```mermaid
+flowchart TD
+    A[Shutdown Signal<br/>SIGINT/SIGTERM] --> B[Stop Accepting<br/>New Work]
+    B --> C[Wait for In-Flight<br/>Operations]
+    C --> D[Flush Pending Data]
+    D --> E[Close Connections]
+    E --> F[Clean Exit<br/>code 0]
+    
+    style A fill:#ffebee
+    style F fill:#e8f5e8
 ```
 
 ---

@@ -197,37 +197,41 @@ Publisher                         Subscriber
 | `--ack-timeout` | `5s` | Timeout before redelivery |
 | `--max-retries` | `3` | Max redelivery attempts |
 
-### Admin Endpoints
+### HTTP Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/publish/{topic}` | POST | Publish message to topic |
+| `/health` | GET | Health status check |
+| `/stats` | GET | Broker statistics |
+
+**Publish Message**:
+```bash
+curl -X POST http://localhost:9090/publish/telemetry \
+  -H "Content-Type: application/json" \
+  -d '{"gpu_id":"gpu_0","utilization":85.2}'
+```
 
 **Health Check**:
 ```bash
 curl http://localhost:9090/health
-# Response:
-# {"status":"healthy","timestamp":"2025-10-20T12:00:00Z"}
+# {"status":"healthy","service":"mq-service","timestamp":"2025-01-01T12:00:00Z"}
 ```
 
-**Queue Statistics**:
+**Broker Statistics**:
 ```bash
 curl http://localhost:9090/stats
-# Response:
-# {
-#   "topics": {
-#     "gpu-telemetry": {
-#       "messages": 15000,
-#       "subscribers": 2,
-#       "throughput_msg_per_sec": 250
-#     }
-#   },
-#   "total_processed": 1000000,
-#   "uptime_seconds": 3600
-# }
+# Returns broker statistics including topic info, queue sizes, subscriber counts
 ```
 
-**List Topics**:
-```bash
-curl http://localhost:9090/topics
-# Response:
-# {
+### gRPC Endpoints
+
+| Method | Purpose |
+|--------|---------|
+| `Publish` | Publish message via gRPC |
+| `Subscribe` | Subscribe to topic (streaming) |
+| `Health` | Health check via gRPC |
+| `GetStats` | Get broker statistics via gRPC |
 #   "topics": ["gpu-telemetry"]
 # }
 ```
@@ -448,10 +452,11 @@ Collector Services / MQ
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/health` | GET | Health status of all services |
-| `/api/v1/gpus` | GET | List available GPUs |
-| `/api/v1/gpus/{id}/telemetry` | GET | GPU telemetry data |
-| `/stats` | GET | MQ statistics |
-| `/docs` | GET | API documentation (Swagger) |
+| `/api/v1/gpus` | GET | List all available GPUs |
+| `/api/v1/gpus/{id}/telemetry` | GET | Get telemetry data for specific GPU |
+| `/api/v1/hosts` | GET | List all hosts in the system |
+| `/api/v1/hosts/{hostname}/gpus` | GET | List GPUs for specific host |
+| `/swagger/` | GET | Interactive API documentation |
 
 ### Health Aggregation
 
