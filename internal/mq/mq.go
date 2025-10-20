@@ -30,18 +30,19 @@ func DefaultBrokerConfig() BrokerConfig {
 
 // PendingMessage represents a message awaiting acknowledgment
 type PendingMessage struct {
-	Message   Message
-	Timestamp time.Time
-	Retries   int
-	TopicName string
-	MessageID string
+	Message    Message
+	Timestamp  time.Time
+	Retries    int
+	TopicName  string
+	MessageID  string
+	queueIndex int
 }
 
 // TopicData holds topic-specific data
 type TopicData struct {
 	subscribers    map[chan []byte]struct{}
 	ackSubscribers map[chan Message]struct{} // Subscribers that support acknowledgment
-	messageQueue   []Message
+	messageQueue   []*PendingMessage
 	pendingMsgs    map[string]*PendingMessage // messageID -> PendingMessage
 }
 
@@ -91,7 +92,7 @@ func (b *Broker) Publish(topic string, msg Message) error {
 		topicData = &TopicData{
 			subscribers:    make(map[chan []byte]struct{}),
 			ackSubscribers: make(map[chan Message]struct{}),
-			messageQueue:   make([]Message, 0),
+			messageQueue:   make([]*PendingMessage, 0),
 			pendingMsgs:    make(map[string]*PendingMessage),
 		}
 		b.topics[topic] = topicData
@@ -104,37 +105,35 @@ func (b *Broker) Publish(topic string, msg Message) error {
 		}
 	}
 
-	// Add to message queue
-	topicData.messageQueue = append(topicData.messageQueue, msg)
-
 	// Generate message ID for acknowledgment tracking
-	msgID := fmt.Sprintf("%s-%d", topic, time.Now().UnixNano())
+	now := time.Now()
+	msgID := fmt.Sprintf("%s-%d", topic, now.UnixNano())
 
-	// Create acknowledgment function
-	ackFunc := func() {
-		b.mu.Lock()
-		defer b.mu.Unlock()
-		if td, exists := b.topics[topic]; exists {
-			delete(td.pendingMsgs, msgID)
-		}
-	}
-
-	// Update message with acknowledgment function
-	msg.Ack = ackFunc
-
-	// Track pending message for acknowledgment timeout
-	topicData.pendingMsgs[msgID] = &PendingMessage{
-		Message:   msg,
-		Timestamp: time.Now(),
+	pendingMsg := &PendingMessage{
+		Message: Message{
+			Payload: msg.Payload,
+		},
+		Timestamp: now,
 		Retries:   0,
 		TopicName: topic,
 		MessageID: msgID,
 	}
 
+	// Update message acknowledgment to remove the pending entry once processed
+	pendingMsg.Message.Ack = func() {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		b.removePendingMessage(topic, msgID)
+	}
+
+	pendingMsg.queueIndex = len(topicData.messageQueue)
+	topicData.messageQueue = append(topicData.messageQueue, pendingMsg)
+	topicData.pendingMsgs[msgID] = pendingMsg
+
 	// Send to regular subscribers (payload only)
 	for ch := range topicData.subscribers {
 		select {
-		case ch <- msg.Payload:
+		case ch <- pendingMsg.Message.Payload:
 		default:
 			// Channel is full, skip this subscriber
 		}
@@ -143,13 +142,49 @@ func (b *Broker) Publish(topic string, msg Message) error {
 	// Send to acknowledgment subscribers (full message with ack function)
 	for ch := range topicData.ackSubscribers {
 		select {
-		case ch <- msg:
+		case ch <- pendingMsg.Message:
 		default:
 			// Channel is full, skip this subscriber
 		}
 	}
 
 	return nil
+}
+
+// removePendingMessage removes a message from tracking structures. Caller must hold b.mu.
+func (b *Broker) removePendingMessage(topic, msgID string) {
+	topicData, exists := b.topics[topic]
+	if !exists {
+		return
+	}
+
+	pending, exists := topicData.pendingMsgs[msgID]
+	if !exists {
+		return
+	}
+
+	delete(topicData.pendingMsgs, msgID)
+
+	if len(topicData.messageQueue) == 0 {
+		pending.queueIndex = -1
+		return
+	}
+
+	idx := pending.queueIndex
+	lastIdx := len(topicData.messageQueue) - 1
+	if idx < 0 || idx > lastIdx {
+		pending.queueIndex = -1
+		return
+	}
+
+	if idx != lastIdx {
+		topicData.messageQueue[idx] = topicData.messageQueue[lastIdx]
+		topicData.messageQueue[idx].queueIndex = idx
+	}
+
+	topicData.messageQueue[lastIdx] = nil
+	topicData.messageQueue = topicData.messageQueue[:lastIdx]
+	pending.queueIndex = -1
 }
 
 // Subscribe subscribes to a topic and returns a channel for receiving messages
@@ -167,7 +202,7 @@ func (b *Broker) Subscribe(topic string) (chan []byte, func(), error) {
 		topicData = &TopicData{
 			subscribers:    make(map[chan []byte]struct{}),
 			ackSubscribers: make(map[chan Message]struct{}),
-			messageQueue:   make([]Message, 0),
+			messageQueue:   make([]*PendingMessage, 0),
 			pendingMsgs:    make(map[string]*PendingMessage),
 		}
 		b.topics[topic] = topicData
@@ -178,9 +213,9 @@ func (b *Broker) Subscribe(topic string) (chan []byte, func(), error) {
 	topicData.subscribers[ch] = struct{}{}
 
 	// Send any existing messages in the queue
-	for _, msg := range topicData.messageQueue {
+	for _, pending := range topicData.messageQueue {
 		select {
-		case ch <- msg.Payload:
+		case ch <- pending.Message.Payload:
 		default:
 			// Channel is full, skip
 		}
@@ -216,7 +251,7 @@ func (b *Broker) SubscribeWithAck(topic string) (chan Message, func(), error) {
 		topicData = &TopicData{
 			subscribers:    make(map[chan []byte]struct{}),
 			ackSubscribers: make(map[chan Message]struct{}),
-			messageQueue:   make([]Message, 0),
+			messageQueue:   make([]*PendingMessage, 0),
 			pendingMsgs:    make(map[string]*PendingMessage),
 		}
 		b.topics[topic] = topicData
@@ -227,35 +262,9 @@ func (b *Broker) SubscribeWithAck(topic string) (chan Message, func(), error) {
 	topicData.ackSubscribers[ch] = struct{}{}
 
 	// Send any existing messages in the queue with acknowledgment tracking
-	for _, msg := range topicData.messageQueue {
-		msgID := fmt.Sprintf("%s-%d", topic, time.Now().UnixNano())
-
-		// Create acknowledgment function
-		ackFunc := func() {
-			b.mu.Lock()
-			defer b.mu.Unlock()
-			if topicData, exists := b.topics[topic]; exists {
-				delete(topicData.pendingMsgs, msgID)
-			}
-		}
-
-		// Create message with acknowledgment
-		msgWithAck := Message{
-			Payload: msg.Payload,
-			Ack:     ackFunc,
-		}
-
-		// Track pending message
-		topicData.pendingMsgs[msgID] = &PendingMessage{
-			Message:   msgWithAck,
-			Timestamp: time.Now(),
-			Retries:   0,
-			TopicName: topic,
-			MessageID: msgID,
-		}
-
+	for _, pending := range topicData.messageQueue {
 		select {
-		case ch <- msgWithAck:
+		case ch <- pending.Message:
 		default:
 			// Channel is full, skip
 		}
@@ -566,8 +575,11 @@ func (b *Broker) processAckTimeouts() {
 
 	now := time.Now()
 
-	for _, topicData := range b.topics {
+	for topicName, topicData := range b.topics {
 		for msgID, pendingMsg := range topicData.pendingMsgs {
+			if pendingMsg.queueIndex == -1 {
+				continue
+			}
 			if now.Sub(pendingMsg.Timestamp) > b.config.AckTimeout {
 				if pendingMsg.Retries < b.config.MaxRetries {
 					// Redeliver message
@@ -593,7 +605,7 @@ func (b *Broker) processAckTimeouts() {
 					}
 				} else {
 					// Max retries exceeded, remove from pending
-					delete(topicData.pendingMsgs, msgID)
+					b.removePendingMessage(topicName, msgID)
 				}
 			}
 		}

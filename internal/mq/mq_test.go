@@ -526,6 +526,75 @@ func TestBrokerRedelivery(t *testing.T) {
 	}
 }
 
+func TestBrokerPendingMessagesNotDuplicatedOnResubscribe(t *testing.T) {
+	config := DefaultBrokerConfig()
+	config.AckTimeout = time.Hour // Avoid redelivery interference during the test
+	broker := NewBroker(config)
+	defer broker.Close()
+
+	topic := "dedupe-topic"
+	msg := Message{
+		Payload: []byte("dedupe"),
+		Ack:     func() {},
+	}
+
+	if err := broker.Publish(topic, msg); err != nil {
+		t.Fatalf("failed to publish: %v", err)
+	}
+
+	ch1, unsubscribe1, err := broker.SubscribeWithAck(topic)
+	if err != nil {
+		t.Fatalf("failed to subscribe first consumer: %v", err)
+	}
+
+	var firstDelivery Message
+	select {
+	case firstDelivery = <-ch1:
+		if firstDelivery.Ack == nil {
+			t.Fatal("expected ack function on first delivery")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for first delivery")
+	}
+
+	// Keep message pending and unsubscribe the first consumer
+	unsubscribe1()
+
+	stats := broker.GetStats()
+	if pending := stats.Topics[topic].PendingMessages; pending != 1 {
+		t.Fatalf("expected 1 pending message after first unsubscribe, got %d", pending)
+	}
+
+	ch2, unsubscribe2, err := broker.SubscribeWithAck(topic)
+	if err != nil {
+		t.Fatalf("failed to subscribe second consumer: %v", err)
+	}
+	defer unsubscribe2()
+
+	var secondDelivery Message
+	select {
+	case secondDelivery = <-ch2:
+		if secondDelivery.Ack == nil {
+			t.Fatal("expected ack function on second delivery")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for second delivery")
+	}
+
+	stats = broker.GetStats()
+	if pending := stats.Topics[topic].PendingMessages; pending != 1 {
+		t.Fatalf("expected pending messages to remain at 1 after resubscribe, got %d", pending)
+	}
+
+	// Acknowledge to clean up state for future tests
+	secondDelivery.Ack()
+
+	stats = broker.GetStats()
+	if pending := stats.Topics[topic].PendingMessages; pending != 0 {
+		t.Fatalf("expected 0 pending messages after ack, got %d", pending)
+	}
+}
+
 func TestBrokerAdminEndpoint(t *testing.T) {
 	config := DefaultBrokerConfig()
 	broker := NewBroker(config)
