@@ -19,13 +19,19 @@ cd telemetry-pipeline/deploy/docker
 
 Open [http://localhost:5173](http://localhost:5173) to view the dashboard.
 
-### With Kubernetes (10 minutes)
+### With Kubernetes(Kind) (10 minutes)
 
 ```bash
 git clone https://github.com/harishb93/telemetry-pipeline.git
 cd telemetry-pipeline/deploy/helm
 ./quickstart.sh
 ```
+
+![QuickStart Help](docs/QuickStart-Help.gif)
+
+![QuickStart Deploy](docs/QuickStart-Deploy.gif)
+
+![Dashboard](docs/Dashboard.gif)
 
 See [Quickstart Guide](docs/quickstart/README.md) for detailed setup instructions.
 
