@@ -107,7 +107,7 @@ func (fs *FileStorage) WriteTelemetry(telemetry interface{}) error {
 	filePath := filepath.Join(fs.dataDir, fmt.Sprintf("%s.jsonl", gpuID))
 
 	// Open file for appending
-	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open file %s: %w", filePath, err)
 	}
@@ -121,6 +121,25 @@ func (fs *FileStorage) WriteTelemetry(telemetry interface{}) error {
 	jsonData, err := json.Marshal(telemetry)
 	if err != nil {
 		return fmt.Errorf("failed to marshal telemetry data: %w", err)
+	}
+
+	// Check if data already exists in file
+	decoder := json.NewDecoder(file)
+	targetLine := string(jsonData)
+	exists := false
+	for decoder.More() {
+		var existingData json.RawMessage
+		if err := decoder.Decode(&existingData); err != nil {
+			continue // Skip malformed lines
+		}
+		if string(existingData) == targetLine {
+			exists = true
+			break
+		}
+	}
+
+	if exists {
+		return nil // Data already exists, skip writing
 	}
 
 	// Write JSON line
