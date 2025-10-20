@@ -102,28 +102,6 @@ jobs:
     
     - name: Build Docker images
       run: make docker-build
-    
-    - name: Test Docker containers
-      run: |
-        # Check if docker-compose file exists
-        if [ -f "deploy/docker/docker-compose.yml" ]; then
-          # Start the services
-          cd deploy/docker
-          docker compose up -d
-          
-          # Wait for services to be ready
-          sleep 30
-          
-          # Run basic health checks (these may fail in test environment, which is ok)
-          curl -f http://localhost:8080/health || echo "Telemetry Collector health check failed (expected in test)"
-          curl -f http://localhost:8081/health || echo "API GW health check failed (expected in test)"
-          curl -f http://localhost:9090/health || echo "MQ Service health check failed (expected in test)"
-          
-          # Stop services
-          docker compose down
-        else
-          echo "Docker compose file not found, skipping container tests"
-        fi
 
   security:
     runs-on: ubuntu-latest

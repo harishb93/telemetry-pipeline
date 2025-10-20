@@ -190,6 +190,23 @@ docker-build:
 	docker tag dashboard:$(TAG) $(REGISTRY)/dashboard:$(TAG)
 	@echo "Docker images built successfully!"
 
+# Docker targets without Dashboard
+docker-build-pipeline:
+	@echo "Building Docker images with tag: $(TAG)"
+	@echo "Registry: $(REGISTRY)"
+	@echo "Making entrypoint scripts executable..."
+	@chmod +x deploy/docker/entrypoint-*.sh 2>/dev/null || true
+	docker build -f deploy/docker/mq-service.Dockerfile -t mq-service:$(TAG) .
+	docker build -f deploy/docker/telemetry-streamer.Dockerfile -t telemetry-streamer:$(TAG) .
+	docker build -f deploy/docker/telemetry-collector.Dockerfile -t telemetry-collector:$(TAG) .
+	docker build -f deploy/docker/api-gateway.Dockerfile -t api-gateway:$(TAG) .
+	@echo "Tagging images for registry $(REGISTRY)..."
+	docker tag mq-service:$(TAG) $(REGISTRY)/mq-service:$(TAG)
+	docker tag telemetry-streamer:$(TAG) $(REGISTRY)/telemetry-streamer:$(TAG)
+	docker tag telemetry-collector:$(TAG) $(REGISTRY)/telemetry-collector:$(TAG)
+	docker tag api-gateway:$(TAG) $(REGISTRY)/api-gateway:$(TAG)
+	@echo "Docker images built successfully!"
+
 # Docker push target moved to end of file
 
 # Helm targets (using individual charts like quickstart.sh)
