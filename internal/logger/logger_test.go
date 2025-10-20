@@ -167,16 +167,16 @@ func TestNewFromEnv(t *testing.T) {
 			// Set environment variables
 			for key, value := range tt.envVars {
 				if value != "" {
-					os.Setenv(key, value)
+					_ = os.Setenv(key, value)
 				} else {
-					os.Unsetenv(key)
+					_ = os.Unsetenv(key)
 				}
 			}
 
 			// Clean up after test
 			defer func() {
 				for key := range tt.envVars {
-					os.Unsetenv(key)
+					_ = os.Unsetenv(key)
 				}
 			}()
 

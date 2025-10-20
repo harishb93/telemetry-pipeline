@@ -95,7 +95,7 @@ func PreProcessCSVByHostNames(csvPath, hostList string) (string, error) {
 
 	// Write headers to filtered file
 	if err := writer.Write(headers); err != nil {
-		os.Remove(tempFilePath) // Clean up on error
+		_ = os.Remove(tempFilePath) // Clean up on error
 		return csvPath, fmt.Errorf("failed to write headers to filtered file: %w", err)
 	}
 
@@ -143,7 +143,7 @@ func PreProcessCSVByHostNames(csvPath, hostList string) (string, error) {
 	// Flush writer to ensure all data is written
 	writer.Flush()
 	if err := writer.Error(); err != nil {
-		os.Remove(tempFilePath) // Clean up on error
+		_ = os.Remove(tempFilePath) // Clean up on error
 		return csvPath, fmt.Errorf("failed to flush CSV writer: %w", err)
 	}
 
@@ -157,7 +157,7 @@ func PreProcessCSVByHostNames(csvPath, hostList string) (string, error) {
 	// If no records were written, return original file path
 	if recordsWritten == 0 {
 		log.Warn("No records matched the hostname filter, proceeding with original file")
-		os.Remove(tempFilePath) // Clean up empty file
+		_ = os.Remove(tempFilePath) // Clean up empty file
 		return csvPath, nil
 	}
 

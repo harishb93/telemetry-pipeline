@@ -45,7 +45,7 @@ func TestHTTPBroker_Publish_Success(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status": "published"}`))
+		_, _ = w.Write([]byte(`{"status": "published"}`))
 	}))
 	defer server.Close()
 
@@ -65,7 +65,7 @@ func TestHTTPBroker_Publish_ServerError(t *testing.T) {
 	// Create a test server that returns an error
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"error": "internal server error"}`))
+		_, _ = w.Write([]byte(`{"error": "internal server error"}`))
 	}))
 	defer server.Close()
 
@@ -147,7 +147,7 @@ func TestHTTPBroker_ConcurrentPublish(t *testing.T) {
 		mu.Unlock()
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status": "published"}`))
+		_, _ = w.Write([]byte(`{"status": "published"}`))
 	}))
 	defer server.Close()
 
@@ -209,7 +209,7 @@ func TestDirectBrokerClient_Publish_Success(t *testing.T) {
 			t.Errorf("Expected path '/publish/test-topic', got %s", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status": "published"}`))
+		_, _ = w.Write([]byte(`{"status": "published"}`))
 	}))
 	defer server.Close()
 
@@ -228,7 +228,7 @@ func TestDirectBrokerClient_Publish_Success(t *testing.T) {
 func TestDirectBrokerClient_Publish_Error(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error": "bad request"}`))
+		_, _ = w.Write([]byte(`{"error": "bad request"}`))
 	}))
 	defer server.Close()
 
@@ -271,7 +271,7 @@ func TestDirectBrokerClient_SubscribeWithAck(t *testing.T) {
 				},
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(response)
+			_ = json.NewEncoder(w).Encode(response)
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -308,7 +308,7 @@ func TestDirectBrokerClient_PollMessages_NoMessages(t *testing.T) {
 				"messages": []map[string]string{},
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(response)
+			_ = json.NewEncoder(w).Encode(response)
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -339,7 +339,7 @@ func TestDirectBrokerClient_PollMessages_ServerError(t *testing.T) {
 	// Mock server that returns errors
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal Server Error"))
+		_, _ = w.Write([]byte("Internal Server Error"))
 	}))
 	defer server.Close()
 

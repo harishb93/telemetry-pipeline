@@ -183,8 +183,8 @@ func TestPreProcessCSVByHostNames_ValidFiltering(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open filtered file: %v", err)
 	}
-	defer file.Close()
-	defer os.Remove(result)
+	defer func() { _ = file.Close() }()
+	defer func() { _ = os.Remove(result) }()
 
 	reader := csv.NewReader(file)
 	allRecords, err := reader.ReadAll()
@@ -258,7 +258,7 @@ func TestPreProcessCSVByHostNames_CaseInsensitiveHeader(t *testing.T) {
 	if result == csvPath {
 		t.Error("Expected filtering to work with case-insensitive header")
 	}
-	defer os.Remove(result)
+	defer func() { _ = os.Remove(result) }()
 }
 
 func TestPreProcessCSVByHostNames_WhitespaceHandling(t *testing.T) {
@@ -280,14 +280,14 @@ func TestPreProcessCSVByHostNames_WhitespaceHandling(t *testing.T) {
 	if result == csvPath {
 		t.Error("Expected filtering to work with whitespace handling")
 	}
-	defer os.Remove(result)
+	defer func() { _ = os.Remove(result) }()
 
 	// Verify content
 	file, err := os.Open(result)
 	if err != nil {
 		t.Fatalf("Failed to open filtered file: %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	reader := csv.NewReader(file)
 	allRecords, err := reader.ReadAll()
@@ -338,7 +338,7 @@ func TestPreProcessCSVByHostNames_InsufficientColumns(t *testing.T) {
 	if result == csvPath {
 		t.Error("Expected filtering to create new file even with some invalid records")
 	}
-	defer os.Remove(result)
+	defer func() { _ = os.Remove(result) }()
 }
 
 // ==== NewStreamer Tests ====
@@ -1201,12 +1201,12 @@ func BenchmarkPreProcessCSVByHostNames(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create benchmark CSV: %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	writer := csv.NewWriter(file)
-	writer.Write(headers)
+	_ = writer.Write(headers)
 	for _, record := range records {
-		writer.Write(record)
+		_ = writer.Write(record)
 	}
 	writer.Flush()
 
@@ -1219,7 +1219,7 @@ func BenchmarkPreProcessCSVByHostNames(b *testing.B) {
 			b.Fatalf("PreProcessCSVByHostNames failed: %v", err)
 		}
 		if result != csvPath {
-			os.Remove(result) // Clean up filtered file
+			_ = os.Remove(result) // Clean up filtered file
 		}
 	}
 }
@@ -1312,7 +1312,7 @@ func TestStreamer_Integration_CompleteWorkflow(t *testing.T) {
 	}
 	defer func() {
 		if filteredCSV != originalCSV {
-			os.Remove(filteredCSV)
+			_ = os.Remove(filteredCSV)
 		}
 	}()
 

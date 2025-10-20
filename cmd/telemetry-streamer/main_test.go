@@ -221,13 +221,13 @@ func TestEnvironmentVariableHandling(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set environment variables
 			for key, value := range tt.envVars {
-				os.Setenv(key, value)
+				_ = os.Setenv(key, value)
 			}
 
 			// Clean up after test
 			defer func() {
 				for key := range tt.envVars {
-					os.Unsetenv(key)
+					_ = os.Unsetenv(key)
 				}
 			}()
 
@@ -344,8 +344,9 @@ func TestSignalHandling(t *testing.T) {
 	// Test signal handling setup
 	t.Run("signal_channel", func(t *testing.T) {
 		signalCh := make(chan os.Signal, 1)
-		if signalCh == nil {
-			t.Error("Signal channel should not be nil")
+		// Verify channel capacity instead of nil check (make() never returns nil)
+		if cap(signalCh) != 1 {
+			t.Error("Signal channel should have capacity of 1")
 		}
 
 		// Test channel capacity

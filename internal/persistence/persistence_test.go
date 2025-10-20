@@ -127,8 +127,8 @@ func TestFileStore_ErrorCases(t *testing.T) {
 			t.Skipf("Failed to create read-only directory: %v", err)
 		}
 		defer func() {
-			os.Chmod(testDir, 0755) // Make it writable to delete
-			os.RemoveAll(testDir)
+			_ = os.Chmod(testDir, 0755) // Make it writable to delete
+			_ = os.RemoveAll(testDir)
 		}()
 
 		store := NewFileStore(filepath.Join(testDir, "test.json"))
@@ -142,7 +142,7 @@ func TestFileStore_ErrorCases(t *testing.T) {
 
 	t.Run("corrupted_json_file", func(t *testing.T) {
 		filePath := "corrupted_test.json"
-		defer os.Remove(filePath)
+		defer func() { _ = os.Remove(filePath) }()
 
 		// Create a file with invalid JSON
 		if err := os.WriteFile(filePath, []byte("invalid json content {"), 0644); err != nil {
@@ -170,7 +170,7 @@ func TestFileStore_ErrorCases(t *testing.T) {
 
 	t.Run("nil_data_save", func(t *testing.T) {
 		filePath := "nil_test.json"
-		defer os.Remove(filePath)
+		defer func() { _ = os.Remove(filePath) }()
 
 		store := NewFileStore(filePath)
 
@@ -194,7 +194,7 @@ func TestFileStore_ErrorCases(t *testing.T) {
 
 func TestFileStore_LargeData(t *testing.T) {
 	filePath := "large_data_test.json"
-	defer os.Remove(filePath)
+	defer func() { _ = os.Remove(filePath) }()
 
 	store := NewFileStore(filePath)
 
@@ -244,7 +244,7 @@ func TestFileStore_LargeData(t *testing.T) {
 
 func TestFileStore_ConcurrentAccess(t *testing.T) {
 	filePath := "concurrent_test.json"
-	defer os.Remove(filePath)
+	defer func() { _ = os.Remove(filePath) }()
 
 	store := NewFileStore(filePath)
 
@@ -509,7 +509,7 @@ func TestMemoryStore_StressTest(t *testing.T) {
 
 func TestFileStore_FilePermissions(t *testing.T) {
 	filePath := "permissions_test.json"
-	defer os.Remove(filePath)
+	defer func() { _ = os.Remove(filePath) }()
 
 	store := NewFileStore(filePath)
 	data := map[string]string{"key": "value"}
@@ -533,7 +533,7 @@ func TestFileStore_FilePermissions(t *testing.T) {
 
 func TestFileStore_JSONMarshaling(t *testing.T) {
 	filePath := "json_marshaling_test.json"
-	defer os.Remove(filePath)
+	defer func() { _ = os.Remove(filePath) }()
 
 	store := NewFileStore(filePath)
 

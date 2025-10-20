@@ -180,7 +180,7 @@ func TestServerLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect to server: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected health check to return 200, got %d", resp.StatusCode)
