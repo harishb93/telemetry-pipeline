@@ -184,6 +184,98 @@ func (fs *FileStorage) ListGPUFiles() ([]string, error) {
 	return gpuIDs, nil
 }
 
+// ListGPUFilesWithExtension returns a list of all GPU IDs specific data file name
+func (fs *FileStorage) ListGPUFilesWithExtension() ([]string, error) {
+	entries, err := os.ReadDir(fs.dataDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{}, nil
+		}
+		return nil, fmt.Errorf("failed to read data directory: %w", err)
+	}
+
+	var gpuIDFiles []string
+	for _, entry := range entries {
+		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".jsonl" {
+			gpuID := entry.Name()
+			gpuIDFiles = append(gpuIDFiles, gpuID)
+		}
+	}
+
+	return gpuIDFiles, nil
+}
+
+// GetAllHosts returns all unique hostnames that have telemetry data
+func (fs *FileStorage) GetAllHosts() ([]string, error) {
+	gpuIDFiles, err := fs.ListGPUFilesWithExtension()
+	if err != nil {
+		return nil, err
+	}
+	hostsMap := make(map[string]bool)
+	for _, gpuIDFile := range gpuIDFiles {
+		entriesRaw, err := fs.ReadTelemetryFile(gpuIDFile)
+		if err != nil {
+			return nil, err
+		}
+		// Convert []json.RawMessage to []Telemetry
+		var entries []Telemetry
+		for _, entry := range entriesRaw {
+			var tel Telemetry
+			if err := json.Unmarshal(entry, &tel); err != nil {
+				continue
+			}
+			entries = append(entries, tel)
+		}
+		for _, entry := range entries {
+			if entry.Hostname != "" {
+				hostsMap[entry.Hostname] = true
+			}
+		}
+	}
+
+	hosts := make([]string, 0, len(hostsMap))
+	for host := range hostsMap {
+		hosts = append(hosts, host)
+	}
+	return hosts, nil
+}
+
+// GetGPUsForHost returns all GPU IDs associated with a specific hostname
+func (fs *FileStorage) GetGPUsForHost(hostname string) ([]string, error) {
+	gpuIDFiles, err := fs.ListGPUFilesWithExtension()
+	if err != nil {
+		return nil, err
+	}
+	gpusMap := make(map[string]bool)
+	for _, gpuIDFile := range gpuIDFiles {
+		entriesRaw, err := fs.ReadTelemetryFile(gpuIDFile)
+		if err != nil {
+			return nil, err
+		}
+		// Convert []json.RawMessage to []Telemetry
+		var entries []Telemetry
+		for _, entry := range entriesRaw {
+			var tel Telemetry
+			if err := json.Unmarshal(entry, &tel); err != nil {
+				continue
+			}
+			entries = append(entries, tel)
+		}
+		for _, entry := range entries {
+			if entry.Hostname == hostname {
+				gpusMap[gpuIDFile[:len(gpuIDFile)-6]] = true
+				break // Found this GPU on the host, no need to check more entries
+			}
+		}
+	}
+
+	gpus := make([]string, 0, len(gpusMap))
+	for gpu := range gpusMap {
+		gpus = append(gpus, gpu)
+	}
+	return gpus, nil
+}
+
 // GetFileStats returns statistics about stored files
 func (fs *FileStorage) GetFileStats() (map[string]interface{}, error) {
 	gpuIDs, err := fs.ListGPUFiles()

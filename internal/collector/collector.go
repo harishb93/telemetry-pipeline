@@ -473,8 +473,21 @@ func (c *Collector) GetMemoryStats() map[string]interface{} {
 
 // GetTelemetryForGPU returns telemetry data for a specific GPU
 func (c *Collector) GetTelemetryForGPU(gpuID string, limit int) []*Telemetry {
-	persistenceData := c.memoryStorage.GetTelemetryForGPU(gpuID)
-
+	persistenceDataRaw, err := c.fileStorage.ReadTelemetryFile(gpuID)
+	if err != nil {
+		c.logger.Error("Failed to read telemetry file", "error", err)
+		return []*Telemetry{}
+	}
+	// Convert []json.RawMessage to []Telemetry
+	var persistenceData []Telemetry
+	for _, rawMsg := range persistenceDataRaw {
+		var tel Telemetry
+		if err := json.Unmarshal(rawMsg, &tel); err != nil {
+			c.logger.Error("Failed to unmarshal telemetry data", "error", err)
+			continue
+		}
+		persistenceData = append(persistenceData, tel)
+	}
 	// Convert and apply limit
 	var result []*Telemetry
 	for i, pTel := range persistenceData {
@@ -494,10 +507,16 @@ func (c *Collector) GetTelemetryForGPU(gpuID string, limit int) []*Telemetry {
 
 // GetAllHosts returns all unique hostnames that have telemetry data
 func (c *Collector) GetAllHosts() []string {
-	return c.memoryStorage.GetAllHosts()
+	if hosts, err := c.fileStorage.GetAllHosts(); err == nil {
+		return hosts
+	}
+	return []string{}
 }
 
 // GetGPUsForHost returns all GPU IDs associated with a specific hostname
 func (c *Collector) GetGPUsForHost(hostname string) []string {
-	return c.memoryStorage.GetGPUsForHost(hostname)
+	if gpus, err := c.fileStorage.GetGPUsForHost(hostname); err == nil {
+		return gpus
+	}
+	return []string{}
 }

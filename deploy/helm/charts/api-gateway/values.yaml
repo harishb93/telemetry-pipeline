@@ -16,7 +16,7 @@ namespace: gpu-telemetry
 sharedVolume:
   enabled: true
   existingClaim: collector-data-pvc
-  mountPath: /app/shared-data
+  mountPath: /app/data
 
 # Collector service dependency
 collectorService:
@@ -37,8 +37,8 @@ env:
     value: "8081"
   - name: COLLECTOR_URL
     value: "http://telemetry-collector:8080"
-  - name: SHARED_DATA_PATH
-    value: "/app/shared-data"
+  - name: DATA_DIR
+    value: "/app/data"
   - name: CORS_ORIGINS
     value: "*"
   - name: LOG_LEVEL
