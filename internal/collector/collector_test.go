@@ -164,7 +164,7 @@ func TestMemoryStorageIntegration(t *testing.T) {
 	collector.memoryStorage.StoreTelemetry(persistenceTelemetry)
 
 	// Retrieve and verify
-	retrieved := collector.GetTelemetryForGPU("gpu_0", 10)
+	retrieved := collector.memoryStorage.GetTelemetryForGPU("gpu_0")
 	if len(retrieved) != 1 {
 		t.Fatalf("Expected 1 telemetry entry, got %d", len(retrieved))
 	}
@@ -344,7 +344,7 @@ func TestMessageHandling(t *testing.T) {
 	}
 
 	// Verify telemetry was stored in memory
-	retrieved := collector.GetTelemetryForGPU("gpu_test", 10)
+	retrieved := collector.memoryStorage.GetTelemetryForGPU("gpu_test")
 	if len(retrieved) != 1 {
 		t.Fatalf("Expected 1 telemetry entry, got %d", len(retrieved))
 	}
@@ -429,7 +429,7 @@ func TestGetAllHosts(t *testing.T) {
 	}
 
 	// Check hosts
-	hosts = collector.GetAllHosts()
+	hosts = collector.memoryStorage.GetAllHosts()
 	expectedHosts := 3
 	if len(hosts) != expectedHosts {
 		t.Errorf("Expected %d hosts, got %d", expectedHosts, len(hosts))
@@ -489,7 +489,7 @@ func TestGetGPUsForHost(t *testing.T) {
 	}
 
 	// Test getting GPUs for host1
-	gpus := collector.GetGPUsForHost("host1")
+	gpus := collector.memoryStorage.GetGPUsForHost("host1")
 	expectedGPUs := 3
 	if len(gpus) != expectedGPUs {
 		t.Errorf("Expected %d GPUs for host1, got %d", expectedGPUs, len(gpus))
@@ -505,7 +505,7 @@ func TestGetGPUsForHost(t *testing.T) {
 	}
 
 	// Test getting GPUs for host2
-	gpus = collector.GetGPUsForHost("host2")
+	gpus = collector.memoryStorage.GetGPUsForHost("host2")
 	expectedGPUs = 2
 	if len(gpus) != expectedGPUs {
 		t.Errorf("Expected %d GPUs for host2, got %d", expectedGPUs, len(gpus))
