@@ -358,7 +358,7 @@ func TestDirectBrokerClient_PollMessages_ServerError(t *testing.T) {
 	// Note: The implementation might still deliver empty messages, which is acceptable
 	messageCount := 0
 	timeout := time.After(50 * time.Millisecond)
-	
+
 	for {
 		select {
 		case msg := <-msgCh:
@@ -371,7 +371,7 @@ func TestDirectBrokerClient_PollMessages_ServerError(t *testing.T) {
 			// Expected - either no messages or empty messages due to errors
 			return
 		}
-		
+
 		// Prevent infinite loop in case of unexpected behavior
 		if messageCount > 10 {
 			break

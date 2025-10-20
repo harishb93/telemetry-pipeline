@@ -301,8 +301,8 @@ func TestJSONResponseHandling(t *testing.T) {
 			expectErr:  false,
 		},
 		{
-			name: "Function response (should fail)",
-			data: func() {}, // Functions can't be marshaled to JSON
+			name:       "Function response (should fail)",
+			data:       func() {}, // Functions can't be marshaled to JSON
 			statusCode: http.StatusOK,
 			expectErr:  true,
 		},
@@ -334,7 +334,7 @@ func TestJSONResponseHandling(t *testing.T) {
 				if status := rr.Code; status != tt.statusCode {
 					t.Errorf("Expected status %d for JSON error, got %v", tt.statusCode, status)
 				}
-				
+
 				// Check that the body contains error message due to JSON encoding failure
 				body := rr.Body.String()
 				if !strings.Contains(body, "Internal server error") {

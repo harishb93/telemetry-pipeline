@@ -230,7 +230,7 @@ func TestMessage_SerializationRoundTrip(t *testing.T) {
 				Id:        "msg-002",
 				Topic:     "image-uploads",
 				Payload:   []byte{0x89, 0x50, 0x4E, 0x47}, // PNG header
-				Timestamp: 1640991600,                      // Fixed timestamp
+				Timestamp: 1640991600,                     // Fixed timestamp
 				Headers: map[string]string{
 					"content-type": "image/png",
 					"size":         "1024",

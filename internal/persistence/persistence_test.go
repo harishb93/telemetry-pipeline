@@ -103,7 +103,7 @@ func TestFileStore_ComplexData(t *testing.T) {
 	}
 	// For timestamp, check that they're within 1 second (JSON precision issues)
 	if originalData.Timestamp.Unix() != loadedData.Timestamp.Unix() {
-		t.Errorf("Timestamp mismatch (Unix time):\nOriginal: %d\nLoaded: %d", 
+		t.Errorf("Timestamp mismatch (Unix time):\nOriginal: %d\nLoaded: %d",
 			originalData.Timestamp.Unix(), loadedData.Timestamp.Unix())
 	}
 }
