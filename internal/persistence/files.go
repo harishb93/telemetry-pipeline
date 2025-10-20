@@ -184,36 +184,15 @@ func (fs *FileStorage) ListGPUFiles() ([]string, error) {
 	return gpuIDs, nil
 }
 
-// ListGPUFilesWithExtension returns a list of all GPU IDs specific data file name
-func (fs *FileStorage) ListGPUFilesWithExtension() ([]string, error) {
-	entries, err := os.ReadDir(fs.dataDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return []string{}, nil
-		}
-		return nil, fmt.Errorf("failed to read data directory: %w", err)
-	}
-
-	var gpuIDFiles []string
-	for _, entry := range entries {
-		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".jsonl" {
-			gpuID := entry.Name()
-			gpuIDFiles = append(gpuIDFiles, gpuID)
-		}
-	}
-
-	return gpuIDFiles, nil
-}
-
 // GetAllHosts returns all unique hostnames that have telemetry data
 func (fs *FileStorage) GetAllHosts() ([]string, error) {
-	gpuIDFiles, err := fs.ListGPUFilesWithExtension()
+	gpuIDs, err := fs.ListGPUFiles()
 	if err != nil {
 		return nil, err
 	}
 	hostsMap := make(map[string]bool)
-	for _, gpuIDFile := range gpuIDFiles {
-		entriesRaw, err := fs.ReadTelemetryFile(gpuIDFile)
+	for _, gpuID := range gpuIDs {
+		entriesRaw, err := fs.ReadTelemetryFile(gpuID)
 		if err != nil {
 			return nil, err
 		}
@@ -242,13 +221,13 @@ func (fs *FileStorage) GetAllHosts() ([]string, error) {
 
 // GetGPUsForHost returns all GPU IDs associated with a specific hostname
 func (fs *FileStorage) GetGPUsForHost(hostname string) ([]string, error) {
-	gpuIDFiles, err := fs.ListGPUFilesWithExtension()
+	gpuIDs, err := fs.ListGPUFiles()
 	if err != nil {
 		return nil, err
 	}
 	gpusMap := make(map[string]bool)
-	for _, gpuIDFile := range gpuIDFiles {
-		entriesRaw, err := fs.ReadTelemetryFile(gpuIDFile)
+	for _, gpuID := range gpuIDs {
+		entriesRaw, err := fs.ReadTelemetryFile(gpuID)
 		if err != nil {
 			return nil, err
 		}
@@ -263,7 +242,7 @@ func (fs *FileStorage) GetGPUsForHost(hostname string) ([]string, error) {
 		}
 		for _, entry := range entries {
 			if entry.Hostname == hostname {
-				gpusMap[gpuIDFile[:len(gpuIDFile)-6]] = true
+				gpusMap[gpuID] = true
 				break // Found this GPU on the host, no need to check more entries
 			}
 		}
