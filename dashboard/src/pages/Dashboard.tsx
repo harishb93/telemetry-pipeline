@@ -5,26 +5,12 @@ import { MQOverview } from '@/components/MQOverview';
 import { HostsOverview } from '@/components/HostsOverview';
 import { GPUSelection } from '@/components/GPUSelection';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { apiClient } from '@/api/client';
-import { usePolling } from '@/lib/usePolling';
-import { POLLING_INTERVALS } from '@/lib/config';
 
 export function Dashboard() {
   const [selectedGpu, setSelectedGpu] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
 
   console.log('Dashboard: Rendering with:', { selectedGpu, isLoading });
-
-
-
-  // Telemetry polling for selected GPU
-  const { data: telemetryData } = usePolling(
-    () => selectedGpu ? apiClient.getTelemetry(selectedGpu, { limit: 50 }) : Promise.resolve(null),
-    { 
-      interval: POLLING_INTERVALS.TELEMETRY, 
-      enabled: !!selectedGpu 
-    }
-  );
 
   // Load initial data
   useEffect(() => {
@@ -84,12 +70,11 @@ export function Dashboard() {
         </ErrorBoundary>
         
         <div className="space-y-4">
-        {/* GPU Selection */}
+        {/* GPU Selection with Search */}
         <ErrorBoundary componentName="GPUSelection">
           <GPUSelection 
             selectedGpu={selectedGpu}
             onGpuSelect={setSelectedGpu}
-            telemetryDataPoints={telemetryData?.total || 0}
           />
         </ErrorBoundary>
         </div>

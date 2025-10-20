@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Search, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import { Search, Loader2, Database } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { apiClient } from '@/api/client';
+import type { TelemetryResponse } from '@/lib/types';
 
 interface GPUSelectionProps {
   selectedGpu: string;
@@ -9,167 +10,166 @@ interface GPUSelectionProps {
   telemetryDataPoints?: number;
 }
 
-const ITEMS_PER_PAGE = 12; // Good number for GPU grid display
-
-export function GPUSelection({ selectedGpu, onGpuSelect, telemetryDataPoints = 0 }: GPUSelectionProps) {
+export function GPUSelection({ selectedGpu, onGpuSelect }: GPUSelectionProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [gpus, setGpus] = useState<string[]>([]);
-  const [hosts, setHosts] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [telemetryData, setTelemetryData] = useState<TelemetryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Load GPU and host data
-  const loadData = async () => {
+  const handleSearch = async () => {
+    if (!searchTerm.trim()) {
+      setError('Please enter a GPU ID to search');
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError(null);
-      const [gpuData, hostData] = await Promise.all([
-        apiClient.getGpus(),
-        apiClient.getHosts(),
-      ]);
-      setGpus(gpuData || []);
-      setHosts(hostData || []);
+      setTelemetryData(null);
+      
+      console.log('GPUSelection: Searching for GPU:', searchTerm);
+      const response = await apiClient.getTelemetry(searchTerm.trim(), { limit: 100 });
+      
+      if (response && response.data && response.data.length > 0) {
+        setTelemetryData(response);
+        onGpuSelect(searchTerm.trim());
+      } else {
+        setError(`No telemetry data found for GPU: ${searchTerm}`);
+        setTelemetryData(null);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load data');
+      console.error('GPUSelection: Error fetching telemetry:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch telemetry data');
+      setTelemetryData(null);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Load data on component mount
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  // Filter GPUs based on search term
-  const filteredGpus = gpus.filter(gpu => 
-    gpu.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Calculate pagination
-  const totalPages = Math.ceil(filteredGpus.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
-  const paginatedGpus = filteredGpus.slice(startIndex, endIndex);
-
-  // Reset page when search changes
-  const handleSearchChange = (value: string) => {
-    setSearchTerm(value);
-    setCurrentPage(1);
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
   };
 
-  const handleGpuSelect = (gpu: string) => {
-    onGpuSelect(gpu);
-  };
-
-  const handlePrevPage = () => {
-    setCurrentPage(prev => Math.max(prev - 1, 1));
-  };
-
-  const handleNextPage = () => {
-    setCurrentPage(prev => Math.min(prev + 1, totalPages));
+  const formatJSON = (data: any): string => {
+    return JSON.stringify(data, null, 2);
   };
 
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>GPU Selection</CardTitle>
-            <CardDescription>
-              {gpus.length} GPUs available across {hosts.length} hosts
-            </CardDescription>
-          </div>
-          <button
-            onClick={loadData}
-            disabled={isLoading}
-            className="flex items-center px-3 py-2 border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
-        </div>
+        <CardTitle className="flex items-center gap-2">
+          <Database className="h-5 w-5" />
+          GPU Telemetry Search
+        </CardTitle>
+        <CardDescription>
+          Enter a GPU ID to search for telemetry data
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Search Input */}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <input
+              type="text"
+              placeholder="Enter GPU ID (e.g., GPU-11111111-2222-3333-4444-555555555555)"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyPress={handleKeyPress}
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={isLoading}
+            />
+          </div>
+          <button
+            onClick={handleSearch}
+            disabled={isLoading || !searchTerm.trim()}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Search className="h-4 w-4 mr-2" />
+            )}
+            Search
+          </button>
+        </div>
+
+        {/* Error Message */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <p className="text-red-800 text-sm">Error: {error}</p>
+            <p className="text-red-800 text-sm">{error}</p>
           </div>
         )}
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <input
-            type="text"
-            placeholder="Search GPUs..."
-            value={searchTerm}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-center">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto text-blue-600" />
+              <p className="mt-2 text-sm text-gray-600">Searching for telemetry data...</p>
+            </div>
+          </div>
+        )}
 
-        {/* GPU Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-          {paginatedGpus.map((gpu) => (
-            <button
-              key={gpu}
-              onClick={() => handleGpuSelect(gpu)}
-              className={`px-3 py-2 rounded text-sm border transition-all duration-200 hover:shadow-md ${
-                selectedGpu === gpu
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-md'
-                  : 'bg-white hover:bg-gray-50 hover:text-gray-900 border-gray-200'
-              }`}
-            >
-              {gpu}
-            </button>
-          ))}
-        </div>
+        {/* Telemetry Data Display */}
+        {telemetryData && !isLoading && (
+          <div className="space-y-4">
+            {/* Summary */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <p className="text-green-800 text-sm font-medium">
+                ✅ Found {telemetryData.total} telemetry entries for GPU: {selectedGpu}
+              </p>
+              <p className="text-green-700 text-xs mt-1">
+                Showing {telemetryData.data?.length || 0} entries (limit: {telemetryData.pagination.limit})
+              </p>
+            </div>
 
-        {/* Empty state */}
-        {filteredGpus.length === 0 && (
+            {/* JSON Response Display */}
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-gray-900">Telemetry Data Response:</h4>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-96 overflow-auto">
+                <pre className="text-xs text-gray-800 whitespace-pre-wrap font-mono">
+                  {formatJSON(telemetryData)}
+                </pre>
+              </div>
+            </div>
+
+            {/* Quick Stats */}
+            {telemetryData.data && telemetryData.data.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2 border-t border-gray-200">
+                <div className="text-center p-2 bg-blue-50 rounded">
+                  <p className="text-xs text-gray-600">Total Entries</p>
+                  <p className="text-lg font-semibold text-blue-600">{telemetryData.total}</p>
+                </div>
+                <div className="text-center p-2 bg-green-50 rounded">
+                  <p className="text-xs text-gray-600">Returned</p>
+                  <p className="text-lg font-semibold text-green-600">{telemetryData.data.length}</p>
+                </div>
+                <div className="text-center p-2 bg-purple-50 rounded">
+                  <p className="text-xs text-gray-600">GPU ID</p>
+                  <p className="text-xs font-medium text-purple-600 truncate" title={selectedGpu}>
+                    {selectedGpu.split('-')[0]}...
+                  </p>
+                </div>
+                <div className="text-center p-2 bg-orange-50 rounded">
+                  <p className="text-xs text-gray-600">Host</p>
+                  <p className="text-xs font-medium text-orange-600">
+                    {telemetryData.data[0]?.hostname || 'N/A'}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Instructions */}
+        {!telemetryData && !isLoading && !error && (
           <div className="text-center py-8 text-gray-500">
-            {searchTerm ? `No GPUs found matching "${searchTerm}"` : 'No GPUs available'}
-          </div>
-        )}
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-600">
-              Showing {startIndex + 1}-{Math.min(endIndex, filteredGpus.length)} of {filteredGpus.length} GPUs
-            </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={handlePrevPage}
-                disabled={currentPage === 1}
-                className="flex items-center px-3 py-1 border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Previous
-              </button>
-              <span className="px-3 py-1 text-sm">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={handleNextPage}
-                disabled={currentPage === totalPages}
-                className="flex items-center px-3 py-1 border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Selected GPU Info */}
-        {selectedGpu && (
-          <div className="pt-2 border-t border-gray-200">
-            <p className="text-sm text-gray-600">
-              Selected: <span className="font-medium text-gray-900">{selectedGpu}</span> • {telemetryDataPoints} data points
-            </p>
+            <Database className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+            <p className="text-sm">Enter a GPU ID above to search for telemetry data</p>
+            <p className="text-xs mt-1 text-gray-400">Press Enter or click Search to fetch data</p>
           </div>
         )}
       </CardContent>
