@@ -117,9 +117,9 @@ graph TD
 - **Graceful Shutdown**: Signal-based cleanup with proper resource management
 
 ### Custom Message Queue
-- **Custom Implementation**: No external dependencies (Kafka, RabbitMQ, etc.)
+- **Custom Implementation**: No external dependencies (Kafka, RabbitMQ, Redis, etc.)
 - **Acknowledgment Semantics**: Message acknowledgment with timeout and redelivery
-- **Persistence Layer**: Optional disk persistence for message durability
+- **Persistence Layer**: Disk persistence for message durability
 - **Admin Endpoints**: HTTP APIs for monitoring queue stats and health
 - **Concurrency Safe**: Thread-safe operations with proper locking
 
@@ -184,6 +184,16 @@ For Kubernetes
 cd telemetry-pipeline/deploy/helm
 ./quickstart.sh down
 ```
+
+## Known Issues/Constraints
+1. This project doesn't use any open source tools or storage options like Redis/PostGres. Fetching stats across pods through file storage is inefficient and inconsistent
+2. MQ Service is not Load-Balanced - Scaling would send requests to MQ Service in a round-robin fashion
+3. No Aggregated Stats Endpoint for MQ
+
+## Next Steps(Design Considerations)
+
+1. Add a REDIS layer to aggregate stats for MQ pods
+2. Implement Aggregated Stats Endpoint for MQ Service using the REDIS
 
 ## 🤝 Contributing
 
