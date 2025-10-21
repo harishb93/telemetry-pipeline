@@ -67,43 +67,23 @@ cd deploy/docker
 docker run -d -p 5000:5000 --name registry registry:2
 
 # 2. Build images
-docker-compose build
+docker compose build
 
 # 3. Start services
-docker-compose up -d
+docker compose up -d
 
 # 4. Check service status
-docker-compose ps
+docker compose ps
 
 # 5. View logs
-docker-compose logs -f api-gateway
+docker compose logs -f api-gateway
 
 # 6. Test the API
 curl http://localhost:8081/health
 
 # 7. Stop services
-docker-compose down
+docker compose down
 ```
-
-### Environment Variables
-
-Edit `.env` in `deploy/docker/` to customize:
-
-```env
-# Image registry
-REGISTRY=localhost:5000
-TAG=latest
-
-# Port mappings
-DASHBOARD_PORT=8080
-API_GATEWAY_PORT=8081
-MQ_PORT=9090
-
-# Performance tuning
-STREAMER_WORKERS=4
-COLLECTOR_WORKERS=4
-```
-
 ---
 
 ## Quick Start Option 2: Kubernetes with Kind (10 minutes)
@@ -117,9 +97,6 @@ cd deploy/helm
 # Run the quickstart script
 ./quickstart.sh
 
-# Access the dashboard (in a new terminal)
-kubectl port-forward -n telemetry-pipeline svc/dashboard 8080:80
-
 # Open browser
 open http://localhost:8080
 ```
@@ -129,6 +106,10 @@ The quickstart script will:
 - Build and push all Docker images
 - Deploy Helm charts to the cluster
 - Verify all pods are running
+- Port-forward API Gateway and Dashboard on 8081 and 8080 ports
+- Show Status
+- Bring down the applications, cluster and registry
+- Show logs of all components
 
 ### Step-by-Step Kubernetes Setup
 
@@ -151,25 +132,28 @@ docker push localhost:5000/telemetry-streamer:latest
 # - dashboard
 
 # 4. Create namespace
-kubectl create namespace telemetry-pipeline
+kubectl create namespace gpu-telemetry
 
 # 5. Deploy via Helm
-helm upgrade --install telemetry-pipeline ./deploy/helm/charts \
-  --namespace telemetry-pipeline \
+helm upgrade --install mq-service ./deploy/helm/charts/mq-service \
+  --namespace gpu-telemetry \
   --create-namespace \
   --set images.registry=localhost:5000 \
   --set images.tag=latest
 
-# 6. Wait for pods to be ready
-kubectl wait --for=condition=ready pod \
-  -l app.kubernetes.io/instance=telemetry-pipeline \
-  -n telemetry-pipeline --timeout=300s
+Do this for individual component 
+Note: For best performance, helm install in the below order
+1. mq-service
+2. telemetry-collector
+3. api-gateway
+4. telemetry-streamer
+5. dashboard
 
-# 7. Port-forward to access services
-kubectl port-forward -n telemetry-pipeline svc/dashboard 8080:80
-kubectl port-forward -n telemetry-pipeline svc/api-gateway 8081:8081
+# 6. Port-forward to access services
+kubectl port-forward -n gpu-telemetry svc/dashboard 8080:80
+kubectl port-forward -n gpu-telemetry svc/api-gateway 8081:8081
 
-# 8. Access services
+# 7. Access services
 open http://localhost:8080  # Dashboard
 curl http://localhost:8081/health  # API
 ```
@@ -178,29 +162,33 @@ curl http://localhost:8081/health  # API
 
 ```bash
 # Check pod status
-kubectl get pods -n telemetry-pipeline
+kubectl get pods -n gpu-telemetry
 
 # Check services
-kubectl get svc -n telemetry-pipeline
+kubectl get svc -n gpu-telemetry
 
 # View logs
-kubectl logs -n telemetry-pipeline deployment/telemetry-collector -f
+kubectl logs -n gpu-telemetry deployment/telemetry-collector -f
 
 # Check resource usage
-kubectl top pods -n telemetry-pipeline
+kubectl top pods -n gpu-telemetry
 
 # Describe a pod (for debugging)
-kubectl describe pod -n telemetry-pipeline <pod-name>
+kubectl describe pod -n gpu-telemetry <pod-name>
 ```
 
 ### Clean Up
 
 ```bash
 # Remove Helm deployment
-helm uninstall telemetry-pipeline -n telemetry-pipeline
+helm uninstall telemetry-streamer -n gpu-telemetry
+helm uninstall dashboard -n gpu-telemetry
+helm uninstall api-gateway -n gpu-telemetry
+helm uninstall telemetry-collector -n gpu-telemetry
+helm uninstall mq-service -n gpu-telemetry
 
 # Delete namespace
-kubectl delete namespace telemetry-pipeline
+kubectl delete namespace gpu-telemetry
 
 # Delete Kind cluster
 kind delete cluster --name telemetry
@@ -221,10 +209,13 @@ curl http://localhost:8081/health | jq .
 
 # Response includes collector status:
 # {
-#   "status": "healthy",
-#   "collector": {
-#     "status": "healthy"
-#   }
+#     "collector": {
+#         "status": "healthy"
+#     },
+#     "service": "telemetry-api-gateway",
+#     "status": "healthy",
+#     "timestamp": "2025-10-21T03:50:40.570657865Z",
+#     "version": "1.0.0"
 # }
 ```
 
@@ -243,30 +234,39 @@ curl http://localhost:8081/api/v1/gpus/gpu_0/telemetry | jq .
 # Get specific number of entries
 curl "http://localhost:8081/api/v1/gpus/gpu_0/telemetry?limit=5" | jq .
 
-# Get entries in reverse order
-curl "http://localhost:8081/api/v1/gpus/gpu_0/telemetry?reverse=true" | jq .
 ```
 
 ### 4. Check Queue Statistics
 
 ```bash
-# MQ queue stats
-curl http://localhost:9090/stats | jq .
+# MQ queue stats through dashboard api
+curl http://localhost:8080/mq/stats | jq .
 
-# Response shows message count and throughput
+# Response includes topics and size
+# {
+#   topics: {
+#   telemetry: {
+#     queue_size: 0,
+#     subscriber_count: 2,
+#     pending_messages: 0
+#   }
+#   }
+# }
 ```
 
 ### 5. Dashboard
 
 Open your browser:
-- **Docker**: http://localhost:8080
+- **Docker**: http://localhost:5173
 - **Kubernetes**: http://localhost:8080 (after port-forward)
 
 You'll see:
 - List of available GPUs
-- Real-time telemetry charts
+- List of available Hosts
 - Service health status
 - Message queue statistics
+- GPUs per Hosts
+- Telemetry per GPU (Last 100 datapoints)
 
 ---
 
@@ -334,12 +334,12 @@ apiGateway:
 docker ps
 
 # View compose logs
-docker-compose logs api-gateway
+docker compose logs api-gateway
 
 # Rebuild everything
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
+docker compose down
+docker compose build --no-cache
+docker compose up -d
 ```
 
 **Port already in use**:
@@ -359,19 +359,19 @@ kill -9 <PID>
 kubectl describe nodes
 
 # Check pod events
-kubectl describe pod -n telemetry-pipeline <pod-name>
+kubectl describe pod -n gpu-telemetry <pod-name>
 
 # Check logs for startup errors
-kubectl logs -n telemetry-pipeline <pod-name>
+kubectl logs -n gpu-telemetry <pod-name>
 ```
 
 **API Gateway unreachable**:
 ```bash
 # Verify pod is running
-kubectl get pod -n telemetry-pipeline -l app=api-gateway
+kubectl get pod -n gpu-telemetry -l app=api-gateway
 
 # Check port-forward is active
-kubectl port-forward -n telemetry-pipeline svc/api-gateway 8081:8081
+kubectl port-forward -n gpu-telemetry svc/api-gateway 8081:8081
 
 # Test from another terminal
 curl http://localhost:8081/health
@@ -380,10 +380,10 @@ curl http://localhost:8081/health
 **Dashboard shows "Error" for services**:
 ```bash
 # Check API Gateway logs
-kubectl logs -n telemetry-pipeline deployment/api-gateway
+kubectl logs -n gpu-telemetry deployment/api-gateway
 
 # Verify network connectivity between pods
-kubectl exec -it deployment/dashboard -n telemetry-pipeline -- \
+kubectl exec -it deployment/dashboard -n gpu-telemetry -- \
   curl http://api-gateway:8081/health
 ```
 
@@ -417,7 +417,7 @@ After getting the pipeline running:
 
 ### Stream Custom CSV Data
 
-1. Place your CSV file in `deploy/docker/sample-data/`
+1. Place your CSV file in `deploy/docker/sample-data/` (in the same format)
 2. Update Docker environment or Kubernetes values to point to your CSV
 3. Restart the streamer service
 
@@ -426,27 +426,15 @@ After getting the pipeline running:
 **Docker**:
 ```bash
 # Scale specific service in docker-compose
-docker-compose up -d --scale telemetry-collector=3
+docker compose up -d --scale telemetry-collector=3
 ```
 
 **Kubernetes**:
 ```bash
 # Scale deployment
-kubectl scale deployment telemetry-collector \
-  -n telemetry-pipeline --replicas=3
+kubectl scale deployment api-gateway \
+  -n gpu-telemetry --replicas=3
 ```
-
-### Export Telemetry Data
-
-```bash
-# Export to CSV
-curl "http://localhost:8081/api/v1/gpus/gpu_0/telemetry?limit=1000" | \
-  jq -r '.[] | [.timestamp, .metrics.temperature, .metrics.utilization] | @csv' > data.csv
-
-# Export to JSON
-curl "http://localhost:8081/api/v1/gpus/gpu_0/telemetry?limit=1000" > data.json
-```
-
 ---
 
 ## Getting Help

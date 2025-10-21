@@ -88,13 +88,13 @@ graph TD
 ```
 
 **Key Features**:
-- **In-Memory Storage**: High-performance message queue in RAM
+- **In-Memory Storage**: Optional High-performance message queue in RAM
 - **Message Acknowledgment**: Ensures delivery reliability
   - Message is held until acknowledged by subscriber
   - Automatic redelivery on timeout (5s default)
   - Prevents message loss with retry mechanism
 - **Topic-Based Routing**: Subscribers receive messages from specific topics
-- **Persistence Layer**: Optional disk persistence for durability
+- **Persistence Layer**: Disk persistence for durability(default)
 - **Admin Endpoints**: Real-time statistics and health monitoring
 
 **Message Lifecycle**:
@@ -267,10 +267,10 @@ graph TB
     subgraph K8S["Kubernetes Cluster"]
         subgraph NS["Namespace: gpu-telemetry"]
             ST[Streamer<br/>DaemonSet<br/>2 replicas]
-            CO[Collector<br/>Deployment<br/>2 replicas]
+            CO[Collector<br/>StatefulSet<br/>2 replicas]
             AG[API Gateway<br/>Deployment<br/>2 replicas]
             
-            MQ[MQ Service<br/>Deployment<br/>• In-memory broker<br/>• Stateless scaling]
+            MQ[MQ Service<br/>StatefulSet<br/>• In-memory broker<br/>• Stateless scaling]
             
             PV[Persistent Volume<br/>MQ optional persistence]
         end
@@ -417,7 +417,7 @@ flowchart TD
 
 ### Why Kubernetes DaemonSet for Streamer?
 
-1. **Per-Node Processing**: Collect telemetry from node where GPU resides
+1. **Mimic Per-Node Processing**: Collect telemetry from node where GPU resides
 2. **Auto-Scaling**: Streamer runs on every node automatically
 3. **Resilience**: Node failure doesn't stop entire pipeline
 4. **Resource Awareness**: Streamer respects node capacity

@@ -51,7 +51,7 @@ Message Queue
 | Parameter | Default | Purpose |
 |-----------|---------|---------|
 | `--csv` | `data.csv` | Path to CSV file |
-| `--workers` | `4` | Number of concurrent workers |
+| `--workers` | `2` | Number of concurrent workers |
 | `--rate` | `1.0` | Messages/second per worker |
 | `--duration` | `0` | How long to stream (0 = infinite) |
 | `--mq-url` | `http://localhost:9090` | MQ broker URL |
@@ -60,10 +60,10 @@ Message Queue
 ### Usage Example
 
 ```bash
-# Run streamer with 4 workers at 10 msg/sec per worker for 1 hour
+# Run streamer with 2 workers at 10 msg/sec per worker for 1 hour
 ./telemetry-streamer \
   --csv data.csv \
-  --workers 4 \
+  --workers 2 \
   --rate 10 \
   --duration 1h
 
@@ -232,9 +232,6 @@ curl http://localhost:9090/stats
 | `Subscribe` | Subscribe to topic (streaming) |
 | `Health` | Health check via gRPC |
 | `GetStats` | Get broker statistics via gRPC |
-#   "topics": ["gpu-telemetry"]
-# }
-```
 
 ### Reliability Features
 
@@ -248,7 +245,7 @@ curl http://localhost:9090/stats
    - Exponential backoff between retries
    - Max retry limit prevents infinite loops
 
-3. **Persistence (Optional)**
+3. **Persistence**
    - Write-ahead log (WAL) format
    - Survives broker restart
    - Recovers unacknowledged messages
@@ -288,11 +285,9 @@ The collector:
 ```
 MQ Subscriber
    ↓
-[Worker Pool] (4 workers)
+[Worker Pool] (2 workers)
    ├─ Worker 1: Process messages
-   ├─ Worker 2: Process messages
-   ├─ Worker 3: Process messages
-   └─ Worker 4: Process messages
+   └─ Worker 2: Process messages
    ↓
 [Data Router]
    ├─→ File Storage
@@ -315,7 +310,7 @@ Checkpoint System
 
 | Parameter | Default | Purpose |
 |-----------|---------|---------|
-| `--workers` | `4` | Message processing workers |
+| `--workers` | `2` | Message processing workers |
 | `--data-dir` | `./data` | Directory for file storage |
 | `--max-entries` | `1000` | Max cache entries per GPU |
 | `--checkpoint` | `true` | Enable recovery checkpoints |
@@ -346,18 +341,6 @@ GPU 1 Cache: [Entry 4995, Entry 4996, Entry 4997, Entry 4998, Entry 4999]
 ```bash
 curl http://localhost:8080/health
 # {"status":"healthy","timestamp":"2025-10-20T12:00:00Z"}
-```
-
-**Statistics**:
-```bash
-curl http://localhost:8080/stats
-# {
-#   "total_processed": 150000,
-#   "active_gpus": 4,
-#   "file_entries": 150000,
-#   "cache_entries": 4000,
-#   "uptime_seconds": 3600
-# }
 ```
 
 **Get Telemetry**:
@@ -434,9 +417,6 @@ HTTP Client
 │ ├─ Collector services   │
 │ ├─ MQ service           │
 │ └─ Health checks        │
-│                         │
-│ Caching Layer           │
-│ └─ Response cache       │
 │                         │
 │ Middleware              │
 │ ├─ Logging              │
@@ -523,9 +503,8 @@ The dashboard:
    - Last update timestamp
 
 3. **Statistics**
-   - Total messages processed
-   - Messages per second
-   - Cache hit rate
+   - Total messages pending in queue
+   - Topics
    - Uptime
 
 4. **Responsive Design**
@@ -541,9 +520,9 @@ Browser
 React Application
    ├─ Components
    │  ├─ GPUList
-   │  ├─ TelemetryChart
+   │  ├─ HostList
    │  ├─ HealthStatus
-   │  └─ Statistics
+   │  └─ Telemetry Statistics
    │
    ├─ API Client
    │  └─ Fetch from API Gateway
@@ -649,15 +628,6 @@ Each component logs to stdout with structured JSON format:
 ```json
 {"timestamp":"2025-10-20T12:00:00Z","level":"info","service":"collector","message":"Processed message","gpu_id":"gpu_0"}
 ```
-
-### Metrics
-
-Available via endpoints:
-- Message throughput (msg/sec)
-- Latency (ms)
-- Error rate (%)
-- Cache hit rate (%)
-- Active connections
 
 ---
 
