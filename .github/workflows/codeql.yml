@@ -1,12 +1,13 @@
 name: CodeQL
 
 on:
-  push:
-    branches: [ "**" ]  # Run on all branches
-  pull_request:
-    branches: [ "**" ]  # Run on all pull requests
-  schedule:
-    - cron: '0 6 * * 1' # Weekly on Mondays at 6 AM UTC
+  workflow_dispatch:
+  # push:
+  #   branches: [ "**" ]  # Run on all branches
+  # pull_request:
+  #   branches: [ "**" ]  # Run on all pull requests
+  # schedule:
+  #   - cron: '0 6 * * 1' # Weekly on Mondays at 6 AM UTC
 
 jobs:
   analyze:
